@@ -24,7 +24,7 @@ const INDICES = {
         name: { type: 'text', analyzer: 'folded', fields: { prefix: { type: 'text', analyzer: 'prefix', search_analyzer: 'folded' }, raw: { type: 'keyword' } } },
         emails: { type: 'keyword', normalizer: 'lowercase', fields: { text: { type: 'text', analyzer: 'folded' } } },
         company: { type: 'text', analyzer: 'folded', fields: { raw: { type: 'keyword' } } },
-        ticket_type: { type: 'keyword' }, needs_assistance: { type: 'boolean' },
+        ticket_type: { type: 'keyword' }, needs_assistance: { type: 'boolean' }, registered_at: { type: 'date' },
         ticket_email: { properties: { status: { type: 'keyword' }, at: { type: 'date' }, detail: { type: 'keyword' } } },
         synthetic: { type: 'boolean' },
       },

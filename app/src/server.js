@@ -220,6 +220,35 @@ if (ROLE === 'web') {
     res.json({ attendees: out });
   }));
 
+  // Walk-up registration at the desk (and how we register judges for the live demo).
+  app.post('/api/attendees', wrap(async (req, res) => {
+    const name = String(req.body?.name ?? '').trim().slice(0, 100);
+    const email = m.normEmail(req.body?.email);
+    const company = String(req.body?.company ?? '').trim().slice(0, 100);
+    if (name.length < 2) throw bad('name is required');
+    if (!/^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,}$/.test(email)) throw bad('invalid email');
+    const dupe = await es().search({ index: INDEX.attendees, size: 1, query: { term: { emails: email } } });
+    if (dupe.hits.hits.length) return res.status(409).json({ error: 'already registered', badge_id: dupe.hits.hits[0]._id });
+    const badge = `W${Date.now().toString(36).toUpperCase().slice(-5)}${Math.floor(Math.random() * 36).toString(36).toUpperCase()}`;
+    await es().index({ index: INDEX.attendees, id: badge, op_type: 'create', refresh: 'wait_for', document: { badge_id: badge, order_id: `WALKUP-${badge}`, name, emails: [email], company, ticket_type: 'walk-up', registered_at: new Date().toISOString(), synthetic: false } });
+    t.annotate({ 'leadguard.attendee.ticket_type': 'walk-up' });
+    res.status(201).json({ badge_id: badge, name, company });
+  }));
+
+  // Badges to print: walk-ups (newest first), or explicit ids. Name, company and badge id only.
+  app.get('/api/badges', wrap(async (req, res) => {
+    const ids = String(req.query.ids ?? '').split(',').map((x) => x.trim().toUpperCase()).filter(m.isId).slice(0, 60);
+    const r = ids.length
+      ? await es().mget({ index: INDEX.attendees, ids })
+      : await es().search({ index: INDEX.attendees, size: 60, query: { term: { ticket_type: 'walk-up' } }, sort: [{ registered_at: { order: 'desc', unmapped_type: 'date' } }] });
+    const docs = ids.length ? r.docs.filter((d) => d.found) : r.hits.hits;
+    res.json({ badges: docs.map((d) => ({ badge_id: d._id, name: d._source.name, company: d._source.company, ticket_type: d._source.ticket_type })) });
+  }));
+
+  // Browser libraries for badges (QR generation) and scanning on phones without BarcodeDetector.
+  const vendor = { 'qrcode.js': require.resolve('qrcode-generator'), 'jsQR.js': require.resolve('jsqr') };
+  app.get('/vendor/:file', (req, res) => (vendor[req.params.file] ? res.type('js').sendFile(vendor[req.params.file]) : res.status(404).end()));
+
   app.get('/api/booths', wrap(async (_req, res) => {
     const r = await es().search({ index: INDEX.booths, size: 100, sort: [{ booth_id: 'asc' }] });
     res.json({ booths: r.hits.hits.map((h) => h._source) });

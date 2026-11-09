@@ -35,3 +35,38 @@ jobs:
             -schema-location default \
             -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
             /tmp/deploy.yaml
+  a11y:
+    # Merge Forward: every screen, light and dark, must have no serious or critical axe violations.
+    runs-on: ubuntu-latest
+    services:
+      elasticsearch:
+        image: docker.elastic.co/elasticsearch/elasticsearch:9.5.6
+        env:
+          discovery.type: single-node
+          xpack.security.enabled: "false"
+          ES_JAVA_OPTS: -Xms512m -Xmx512m
+        ports: ["9200:9200"]
+        options: >-
+          --health-cmd "curl -fs localhost:9200/_cluster/health"
+          --health-interval 10s --health-timeout 5s --health-retries 30
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npx playwright install --with-deps chromium-headless-shell
+      - name: Seed and start the web role
+        env: { ES_URL: "http://localhost:9200", SEED_ON_START: "false", PORT: "8080" }
+        run: |
+          node src/seed.js
+          ROLE=web node src/server.js > /tmp/web.log 2>&1 &
+          for i in $(seq 1 30); do curl -fs localhost:8080/readyz && break; sleep 1; done
+      - run: node a11y/check.js http://127.0.0.1:8080
+      - if: failure()
+        run: cat /tmp/web.log

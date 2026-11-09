@@ -9,6 +9,12 @@ info:
 paths:
   /api/config:
     get: { summary: Version, venue time zone, expo hours }
+  /api/attendees:
+    post:
+      summary: Walk-up registration at the desk; returns a new badge id (409 if the email is already registered)
+      requestBody: { content: { application/json: { schema: { type: object, required: [name, email], properties: { name: { type: string }, email: { type: string, format: email }, company: { type: string } } } } } }
+  /api/badges:
+    get: { summary: Badges to print (walk-ups, or ?ids=B1,B2); name, company and badge id only }
   /api/attendees/search:
     get:
       summary: Desk lookup by name (fuzzy), any linked email, company, badge or order id

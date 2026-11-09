@@ -19,7 +19,7 @@
       '<form class="search" role="search"><label class="sr-only" for="q">Name, any email, company, badge or order number</label>' +
       '<input id="q" type="search" placeholder="Name, any email, company, badge or order no." autocomplete="off" required>' +
       '<label class="sr-only" for="desk">Desk</label><select id="desk">' + ['desk-1', 'desk-2', 'desk-3'].map(function (d) { return '<option' + (d === deskId ? ' selected' : '') + '>' + d + '</option>'; }).join('') + '</select>' +
-      '<button class="primary">Find</button></form><div id="results"></div>';
+      '<button class="primary">Find</button> <button type="button" id="dcam">Scan badge</button></form><video id="video" hidden playsinline muted></video><div id="results"></div>';
     document.getElementById('desk').onchange = function (e) { localStorage.setItem('leadguard.desk', e.target.value); };
     main.querySelector('form').addEventListener('submit', function (e) {
       e.preventDefault();
@@ -31,6 +31,9 @@
         bindPeople();
       }).catch(function (err) { document.getElementById('results').innerHTML = '<p class="full">' + esc(err.message) + '</p>'; });
     });
+    document.getElementById('dcam').onclick = function () {
+      camera(function (code) { document.getElementById('q').value = code; main.querySelector('form').requestSubmit(); });
+    };
     document.getElementById('q').focus();
   }
   function person(p) {
@@ -73,10 +76,10 @@
         r.booths.map(function (b) { return '<option value="' + esc(b.booth_id) + '"' + (b.booth_id === booth ? ' selected' : '') + '>' + esc(b.name) + '</option>'; }).join('') + '</select>' +
         '<label><input type="checkbox" id="wifi"' + (wifiOff ? ' checked' : '') + '> Simulate Wi-Fi off</label></div>' +
         '<form id="scan" class="card"><label for="badge">Badge</label><input id="badge" placeholder="B10023" autocomplete="off" required>' +
-        ('BarcodeDetector' in window ? ' <button type="button" id="cam">Scan with camera</button>' : '') +
+        ' <button type="button" id="cam">Scan with camera</button>' +
         '<label><input type="checkbox" id="consent" checked> They agreed to share their contact details with this sponsor</label>' +
         '<label for="notes">Notes</label><input id="notes" placeholder="What they asked about"><p><button class="primary">Save lead</button></p></form>' +
-        '<p id="qstat" class="meta"></p><video id="video" hidden playsinline></video>';
+        '<p id="qstat" class="meta"></p><video id="video" hidden playsinline muted></video>';
       if (!booth) { booth = r.booths[0].booth_id; localStorage.setItem('leadguard.booth', booth); }
       document.getElementById('booth').onchange = function (e) { booth = e.target.value; localStorage.setItem('leadguard.booth', booth); };
       document.getElementById('wifi').onchange = function (e) { localStorage.setItem('leadguard.wifiOff', e.target.checked ? '1' : '0'); window.rum.event('wifi_toggle', { off: e.target.checked }); };
@@ -114,19 +117,61 @@
       status();
     }
   }
+  // Read a QR/barcode with the phone camera: the browser's BarcodeDetector where it exists
+  // (Chrome on Android), otherwise jsQR on video frames (iPhone Safari, Firefox).
   function camera(onCode) {
     var video = document.getElementById('video');
-    var detector = new window.BarcodeDetector({ formats: ['qr_code', 'code_128'] });
+    var detector = 'BarcodeDetector' in window ? new window.BarcodeDetector({ formats: ['qr_code', 'code_128'] }) : null;
+    var canvas = document.createElement('canvas'); var ctx = canvas.getContext('2d', { willReadFrequently: true });
+    var stop = function (stream) { stream.getTracks().forEach(function (tr) { tr.stop(); }); video.hidden = true; };
     navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } }).then(function (stream) {
-      video.hidden = false; video.srcObject = stream; video.play();
+      video.hidden = false; video.srcObject = stream; video.play(); say('Point the camera at the badge');
+      var started = Date.now();
+      var found = function (code) { stop(stream); onCode(String(code).trim().toUpperCase()); say('Badge read'); window.rum.event('camera_scan', { decoder: detector ? 'native' : 'jsqr' }); };
       var tick = function () {
-        detector.detect(video).then(function (codes) {
-          if (codes.length) { stream.getTracks().forEach(function (tr) { tr.stop(); }); video.hidden = true; onCode(codes[0].rawValue); say('Badge read'); }
-          else requestAnimationFrame(tick);
-        }).catch(function () { requestAnimationFrame(tick); });
+        if (Date.now() - started > 30000) { stop(stream); say('No badge found. Type the badge number instead.'); return; }
+        if (video.readyState < 2) { requestAnimationFrame(tick); return; }
+        if (detector) {
+          detector.detect(video).then(function (codes) { if (codes.length) found(codes[0].rawValue); else requestAnimationFrame(tick); }).catch(function () { requestAnimationFrame(tick); });
+        } else {
+          canvas.width = video.videoWidth; canvas.height = video.videoHeight; ctx.drawImage(video, 0, 0);
+          var img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          var code = window.jsQR && window.jsQR(img.data, img.width, img.height, { inversionAttempts: 'dontInvert' });
+          if (code && code.data) found(code.data); else requestAnimationFrame(tick);
+        }
       };
       tick();
     }).catch(function (err) { say('Camera unavailable: ' + err.message); });
+  }
+
+  // ── Walk-ups and printable badges ───────────────────────────────────────
+  function qrSvg(text) {
+    var qr = window.qrcode(0, 'M'); qr.addData(text); qr.make();
+    return qr.createSvgTag({ cellSize: 4, margin: 2, scalable: true, alt: 'QR code for badge ' + text });
+  }
+  function badges() {
+    main.innerHTML = '<h2>Walk-up registration</h2><form id="walk" class="card"><div class="row">' +
+      '<label class="sr-only" for="wn">Name</label><input id="wn" placeholder="Name" required>' +
+      '<label class="sr-only" for="we">Email</label><input id="we" type="email" placeholder="Email" required>' +
+      '<label class="sr-only" for="wc">Company</label><input id="wc" placeholder="Company"></div>' +
+      '<p><button class="primary">Register and make badge</button> <button type="button" id="print">Print badges</button></p></form>' +
+      '<div id="badgegrid" class="badges"></div>';
+    var draw = function () {
+      var ids = (location.hash.split('?ids=')[1] || '');
+      api('/api/badges' + (ids ? '?ids=' + encodeURIComponent(ids) : '')).then(function (r) {
+        document.getElementById('badgegrid').innerHTML = r.badges.length ? r.badges.map(function (b) {
+          return '<div class="badge-card"><div class="qr">' + qrSvg(b.badge_id) + '</div><div><div class="bname">' + esc(b.name) + '</div><div class="meta">' + esc(b.company || '') + '</div><div class="bid">' + esc(b.badge_id) + '</div></div></div>';
+        }).join('') : '<p class="meta">No walk-ups yet. Registered people get a badge here.</p>';
+      });
+    };
+    document.getElementById('walk').addEventListener('submit', function (e) {
+      e.preventDefault();
+      post('/api/attendees', { name: document.getElementById('wn').value, email: document.getElementById('we').value, company: document.getElementById('wc').value })
+        .then(function (r) { say('Registered ' + r.name + ', badge ' + r.badge_id); window.rum.event('walkup', {}); e.target.reset(); draw(); })
+        .catch(function (err) { say('Could not register: ' + err.message); });
+    });
+    document.getElementById('print').onclick = function () { window.print(); };
+    draw();
   }
 
   // ── Organizer console ──────────────────────────────────────────────────
@@ -209,6 +254,7 @@
     var parts = location.hash.replace(/^#\/?/, '').split('/');
     window.rum.event('navigate', {});
     if (parts[0] === 'desk') desk();
+    else if (parts[0].indexOf('badges') === 0) badges();
     else if (parts[0] === 'scan') scanner();
     else if (parts[0] === 'ops') ops();
     else if (parts[0] === 'leads') leads(parts[1]);
