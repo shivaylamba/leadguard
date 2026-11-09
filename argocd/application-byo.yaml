@@ -12,7 +12,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/shivaylamba/overflow.git
+    repoURL: https://github.com/shivaylamba/leadguard.git
     targetRevision: main
     path: deploy
   destination:

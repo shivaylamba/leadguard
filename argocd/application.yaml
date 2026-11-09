@@ -9,7 +9,7 @@ metadata:
 spec:
   project: team-overflow
   source:
-    repoURL: https://github.com/shivaylamba/overflow.git
+    repoURL: https://github.com/shivaylamba/leadguard.git
     targetRevision: main
     path: deploy
   destination:
