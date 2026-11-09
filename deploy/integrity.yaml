@@ -1,0 +1,52 @@
+# integrity role: the detector loop. One replica; anomaly ids are deterministic.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: integrity
+  labels:
+    app: integrity
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: integrity
+  template:
+    metadata:
+      labels:
+        app: integrity
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9464"
+    spec:
+      containers:
+        - name: integrity
+          image: app
+          ports:
+            - { name: http, containerPort: 8080 }
+            - { name: metrics, containerPort: 9464 }
+          env:
+            - { name: ROLE, value: integrity }
+            - { name: OTEL_SERVICE_NAME, value: leadguard-integrity }
+            - { name: VENUE_TZ, value: America/Denver }
+            - { name: EXPO_HOURS, value: "" }   # e.g. "09:00-18:00" venue time; empty = always watching
+            - { name: INTEGRITY_INTERVAL_S, value: "30" }
+            - name: ES_URL
+              valueFrom: { secretKeyRef: { name: es-credentials, key: url } }
+            - name: ES_API_KEY
+              valueFrom: { secretKeyRef: { name: es-credentials, key: api-key, optional: true } }
+          envFrom:
+            - configMapRef: { name: otel-sdk }
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+            limits: { cpu: 300m, memory: 256Mi }
+          readinessProbe:
+            httpGet: { path: /readyz, port: http }
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 15
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            seccompProfile: { type: RuntimeDefault }
+            capabilities: { drop: ["ALL"] }

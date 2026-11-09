@@ -1,23 +1,24 @@
-# checkin role: POST /api/checkin. An Argo Rollout canary gated by analysis on its own pods.
+# ingest role: every write that must not be lost (check-ins, scan batches, heartbeats,
+# ticket-email webhooks). An Argo Rollout canary judged on its own pods.
 apiVersion: argoproj.io/v1alpha1
 kind: Rollout
 metadata:
-  name: checkin
+  name: ingest
   labels:
-    app: checkin
+    app: ingest
 spec:
   replicas: 2
   revisionHistoryLimit: 3
   selector:
     matchLabels:
-      app: checkin
+      app: ingest
   strategy:
     canary:
       steps:
         - setWeight: 50
         - analysis:
             templates:
-              - templateName: checkin-health
+              - templateName: ingest-health
             args:
               - name: canary-hash
                 valueFrom:
@@ -26,33 +27,33 @@ spec:
   template:
     metadata:
       labels:
-        app: checkin
+        app: ingest
       annotations:
         prometheus.io/scrape: "true"
         prometheus.io/port: "9464"
     spec:
       containers:
-        - name: checkin
+        - name: ingest
           image: app
           ports:
-            - name: http
-              containerPort: 8080
-            - name: metrics
-              containerPort: 9464
+            - { name: http, containerPort: 8080 }
+            - { name: metrics, containerPort: 9464 }
           env:
-            - { name: ROLE, value: checkin }
-            - { name: OTEL_SERVICE_NAME, value: overflow-checkin }
+            - { name: ROLE, value: ingest }
+            - { name: OTEL_SERVICE_NAME, value: leadguard-ingest }
             - name: ES_URL
               valueFrom: { secretKeyRef: { name: es-credentials, key: url } }
             - name: ES_API_KEY
               valueFrom: { secretKeyRef: { name: es-credentials, key: api-key, optional: true } }
             - name: PSEUDONYM_SALT
               valueFrom: { secretKeyRef: { name: app-credentials, key: pseudonym-salt, optional: true } }
+            - name: WEBHOOK_TOKEN
+              valueFrom: { secretKeyRef: { name: app-credentials, key: webhook-token, optional: true } }
           envFrom:
             - configMapRef: { name: otel-sdk }
           resources:
             requests: { cpu: 100m, memory: 160Mi }
-            limits: { cpu: 300m, memory: 320Mi }
+            limits: { cpu: 400m, memory: 320Mi }
           readinessProbe:
             httpGet: { path: /readyz, port: http }
             periodSeconds: 5
@@ -68,11 +69,9 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: checkin
+  name: ingest
 spec:
   selector:
-    app: checkin
+    app: ingest
   ports:
-    - name: http
-      port: 80
-      targetPort: http
+    - { name: http, port: 80, targetPort: http }

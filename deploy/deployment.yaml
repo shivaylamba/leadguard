@@ -1,4 +1,4 @@
-# web role: UI + read APIs. Service app:80 (the team URL) points here.
+# web role: desk, scanner, organizer and sponsor UI + read APIs. Service app:80 (the team URL) points here.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -28,9 +28,10 @@ spec:
               containerPort: 9464
           env:
             - { name: ROLE, value: web }
-            - { name: OTEL_SERVICE_NAME, value: overflow-web-api }
+            - { name: OTEL_SERVICE_NAME, value: leadguard-web }
             - { name: TEAM_NAME, value: "overflow" }
-            - { name: CHECKIN_URL, value: "http://checkin" }
+            - { name: INGEST_URL, value: "http://ingest" }
+            - { name: VENUE_TZ, value: America/Denver }
             - { name: COLLECTOR_HTTP, value: "http://otel-collector:4318" }
             - name: ES_URL
               valueFrom: { secretKeyRef: { name: es-credentials, key: url } }

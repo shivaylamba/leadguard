@@ -1,22 +1,24 @@
-# Overflow: room full? Here's the talk next door.
+# LeadGuard: check-ins you can trust, leads sponsors can trust
 
-Cloud Native Hackathon 2026 (WeMakeDevs). Attendees check in to a room by scanning its QR code; organizers see live
-occupancy; when a room fills, attendees get the most similar talk starting now in a room with seats, filtered by their
-accessibility needs. Full plan and technical spec: [`docs/plan.md`](docs/plan.md).
+Cloud Native Hackathon 2026 (WeMakeDevs). Registration desks find anyone fast (any linked email, fuzzy names,
+order ids) and see whose ticket email bounced; booth scanners keep working offline and sync idempotently; an
+integrity worker flags leads for people who never checked in, shared badges, silent booths and offline scanners,
+before the sponsor complains. Plan, evidence and spec: [`docs/plan.md`](docs/plan.md).
 
 | Piece | Where |
 |---|---|
-| App (one Node 22 image, `ROLE=web` / `ROLE=checkin`) | `app/` (`src/server.js`, `src/queries.js`, `src/ingest.js`, `public/`) |
-| Elasticsearch: the only data store | `app/src/es.js`, mappings in `app/src/ingest.js` |
-| OpenTelemetry: SDK auto-instrumentation, product attributes, browser RUM, Collector | `app/src/telemetry.js`, `app/public/rum.js`, `deploy/otel-*.yaml` |
-| Kubernetes, deployed by Argo CD; `checkin` is a canary with analysis on its own pods | `deploy/` |
+| App: one Node 22 image, `ROLE=web` / `ingest` / `integrity` | `app/src/server.js`, `app/src/integrity.js`, `app/src/model.js` (pure logic, tested) |
+| Elasticsearch: the only data store, ES\|QL LOOKUP JOIN integrity check | `app/src/es.js`, mappings in `app/src/seed.js` |
+| UI: desk, offline booth scanner, organizer, sponsor leads | `app/public/` |
+| API contract (CI-enforced against server and UI) | `api/openapi.yaml`, `app/test/contract.test.js` |
+| OpenTelemetry: SDK, leadguard.* attributes and metrics, browser RUM, Collector with privacy scrub | `app/src/telemetry.js`, `app/public/rum.js`, `deploy/otel-*.yaml` |
+| Kubernetes via Argo CD; `ingest` is a canary judged on its own pods | `deploy/` |
 | Gitar review instructions, rules, auto-apply | `.gitar/` |
-| Local stand-ins on the Civo VM (Elasticsearch, LGTM for Dash0, Prometheus, Argo) | `local/` |
+| Civo stand-ins (kind, Argo, Elasticsearch, LGTM for Dash0, Prometheus) | `local/` |
 
-**The schedule is sample data** (`app/data/*.json`, every record marked `sample: true`) until it is replaced by the
-published KubeCon schedule.
+**All attendees are synthetic** (`.example` email domains). Import a real registration export with `node src/seed.js --csv file.csv`.
 
-Dev loop: `cd app && npm ci && npm test`. Run against a local Elasticsearch: `ES_URL=http://localhost:9200 npm run ingest && npm start`.
+Dev loop: `cd app && npm ci && npm test`. Rehearsal traffic: `node src/simulate.js --base http://127.0.0.1:18080 --minutes 10 --offline radar`.
 
 ---
 

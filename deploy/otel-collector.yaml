@@ -10,7 +10,7 @@ metadata:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: overflow-otel-collector
+  name: leadguard-otel-collector
 rules:
   - apiGroups: [""]
     resources: [pods, namespaces, nodes]
@@ -22,11 +22,11 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: overflow-otel-collector
+  name: leadguard-otel-collector
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: overflow-otel-collector
+  name: leadguard-otel-collector
 subjects:
   - kind: ServiceAccount
     name: otel-collector
@@ -53,13 +53,16 @@ data:
             - { tag_name: k8s.pod.label.rollouts_pod_template_hash, key: rollouts-pod-template-hash, from: pod }
         pod_association:
           - sources: [{ from: connection }]
-      # Product dimensions + privacy. No raw device ids leave the cluster (Gitar: .gitar/review/otel.md).
-      transform/product:
+      # Privacy backstop: attendee identifiers never leave the cluster, even if code slips
+      # (the code already pseudonymises; Gitar: .gitar/review/leads-privacy.md).
+      transform/privacy:
         error_mode: ignore
         trace_statements:
-          - delete_key(span.attributes, "device_id")
+          - delete_matching_keys(span.attributes, "^(badge_id|email|name|attendee\\..*)$")
+          - replace_all_patterns(span.attributes, "value", "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}", "<email>")
         log_statements:
-          - delete_key(log.attributes, "device_id")
+          - delete_matching_keys(log.attributes, "^(badge_id|email|name|attendee\\..*)$")
+          - replace_all_patterns(log.attributes, "value", "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}", "<email>")
       batch: {}
     connectors:
       spanmetrics:
@@ -68,20 +71,19 @@ data:
         dimensions:
           - name: http.route
           - name: http.response.status_code
-          - name: conference.room.id
-          - name: search.mode
-          - name: k8s.pod.label.rollouts_pod_template_hash
+          - name: leadguard.booth.id
+          - name: leadguard.desk.id
         metrics_flush_interval: 15s
       count:
         logs:
-          overflow.ui.events:
-            description: Browser events (search, checkin, overflow_shown, prefs_saved, navigate)
-            conditions: ['attributes["overflow.ui.action"] != nil']
+          leadguard.ui.events:
+            description: Browser events (desk_search, checkin, scan, wifi_toggle, email_linked, navigate)
+            conditions: ['attributes["leadguard.ui.action"] != nil']
             attributes:
-              - key: overflow.ui.action
-          overflow.ui.zero_results:
-            description: Searches that found nothing (attendees looking for talks we don't have)
-            conditions: ['attributes["overflow.ui.action"] == "search" and attributes["search.zero_results"] == true']
+              - key: leadguard.ui.action
+          leadguard.desk.not_found:
+            description: Desk searches that found nobody (the person can't find their ticket)
+            conditions: ['attributes["leadguard.ui.action"] == "desk_search" and attributes["leadguard.search.results"] == 0']
     exporters:
       otlp/backend:
         endpoint: ${env:OTLP_BACKEND_ENDPOINT}
@@ -96,7 +98,7 @@ data:
       pipelines:
         traces:
           receivers: [otlp]
-          processors: [memory_limiter, k8sattributes, transform/product, batch]
+          processors: [memory_limiter, k8sattributes, transform/privacy, batch]
           exporters: [otlp/backend, spanmetrics]
         metrics:
           receivers: [otlp, spanmetrics, count]
@@ -104,7 +106,7 @@ data:
           exporters: [otlp/backend]
         logs:
           receivers: [otlp]
-          processors: [memory_limiter, k8sattributes, transform/product, batch]
+          processors: [memory_limiter, k8sattributes, transform/privacy, batch]
           exporters: [otlp/backend, count]
 ---
 apiVersion: apps/v1

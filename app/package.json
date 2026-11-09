@@ -1,14 +1,15 @@
 {
-  "name": "overflow",
-  "version": "0.1.0",
+  "name": "leadguard",
+  "version": "0.2.0",
   "private": true,
-  "description": "Overflow: room full? here's the talk next door",
+  "description": "LeadGuard: trustworthy check-ins and sponsor leads",
   "main": "src/server.js",
   "scripts": {
     "start": "node --require @opentelemetry/auto-instrumentations-node/register src/server.js",
-    "ingest": "node src/ingest.js",
     "test": "node --test",
-    "lint": "node --check src/server.js && node --check src/queries.js && node --check src/ingest.js && node --check src/es.js && node --check src/telemetry.js && node --check public/app.js && node --check public/rum.js"
+    "lint": "for f in src/*.js public/*.js; do node --check \"$f\" || exit 1; done",
+    "seed": "node src/seed.js",
+    "simulate": "node src/simulate.js"
   },
   "engines": {
     "node": ">=22"

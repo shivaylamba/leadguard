@@ -56,7 +56,9 @@ k -n "team-$TEAM" create secret generic otlp-backend \
   --from-literal=endpoint=lgtm.observability:4317 --from-literal=token=none --from-literal=insecure=true \
   --dry-run=client -o yaml | k apply -f -
 if ! k -n "team-$TEAM" get secret app-credentials >/dev/null 2>&1; then
-  k -n "team-$TEAM" create secret generic app-credentials --from-literal=pseudonym-salt="$(openssl rand -hex 16)"
+  k -n "team-$TEAM" create secret generic app-credentials --from-literal=pseudonym-salt="$(openssl rand -hex 16)" --from-literal=webhook-token="$(openssl rand -hex 16)"
+elif ! k -n "team-$TEAM" get secret app-credentials -o jsonpath='{.data.webhook-token}' | grep -q .; then
+  k -n "team-$TEAM" patch secret app-credentials -p "{\"stringData\":{\"webhook-token\":\"$(openssl rand -hex 16)\"}}"
 fi
 
 k apply -f argocd/application.yaml

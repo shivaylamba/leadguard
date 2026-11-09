@@ -1,14 +1,18 @@
-// Elasticsearch is the only data store: sessions, rooms, check-ins, prefs, queries, signals.
+// Elasticsearch is the only data store: attendees, check-ins, scans, leads, booths, scanners, anomalies.
 // Local: the in-cluster single node (deploy/local). Hackathon: Elastic Serverless via Secret es-credentials.
 const { Client } = require('@elastic/elasticsearch');
 
 const INDEX = {
-  sessions: 'sessions',
-  rooms: 'rooms',
-  checkins: 'checkins', // data stream (index template in mappings/checkins.json)
-  prefs: 'prefs',
-  queries: 'queries',
-  signals: 'signals',
+  attendees: 'attendees',   // registry, imported from the registration tool (CSV)
+  checkins: 'checkins',     // data stream: every check-in event
+  checkedIn: 'checked_in',  // lookup-mode index: badge_id → first_checkin_at (for ES|QL LOOKUP JOIN)
+  booths: 'booths',
+  scans: 'scans',           // data stream: every scan as received, _id = scan_id (idempotent)
+  leads: 'leads',           // one per booth+badge, what the sponsor exports
+  scanners: 'scanners',     // last heartbeat per scanner device
+  anomalies: 'anomalies',   // one per anomaly, deterministic id
+  emails: 'ticket_emails',  // data stream: ticket email events from the provider webhook
+  signals: 'signals',       // kiosk threat signals (kiosk/detect.py)
 };
 
 let client;

@@ -1,0 +1,70 @@
+openapi: 3.1.0
+info:
+  title: LeadGuard API
+  version: 0.2.0
+  description: |
+    The contract between the server (app/src/server.js), the browser apps (app/public/app.js) and
+    external scanners. CI (app/test/contract.test.js) fails when the three drift apart.
+    All timestamps are ISO-8601 instants; the server stores UTC.
+paths:
+  /api/config:
+    get: { summary: Version, venue time zone, expo hours }
+  /api/attendees/search:
+    get:
+      summary: Desk lookup by name (fuzzy), any linked email, company, badge or order id
+      parameters: [{ name: q, in: query, required: true, schema: { type: string, minLength: 2 } }]
+  /api/attendees/{badge}/emails:
+    post:
+      summary: Link the email the attendee uses now (job change)
+      requestBody: { content: { application/json: { schema: { type: object, required: [email], properties: { email: { type: string, format: email } } } } } }
+  /api/attendees/at-risk:
+    get: { summary: Not checked in and the ticket email bounced, was marked spam, or never arrived }
+  /api/checkin:
+    post:
+      summary: Check a badge in at a desk (first check-in wins; later ones are re-entries)
+      requestBody: { content: { application/json: { schema: { type: object, required: [badge_id], properties: { badge_id: { type: string }, desk_id: { type: string } } } } } }
+  /api/scans/batch:
+    post:
+      summary: Idempotent batch of scans from one scanner; returns the scan_ids stored
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [booth_id, scanner_id, scans]
+              properties:
+                booth_id: { type: string }
+                scanner_id: { type: string }
+                scans:
+                  type: array
+                  maxItems: 500
+                  items:
+                    type: object
+                    required: [scan_id, badge_id, scanned_at, consent]
+                    properties:
+                      scan_id: { type: string }
+                      badge_id: { type: string }
+                      scanned_at: { type: string, format: date-time, description: device clock; corrected server-side if skewed }
+                      consent: { type: boolean }
+                      notes: { type: string, maxLength: 1000 }
+  /api/scanners/heartbeat:
+    post:
+      summary: Scanner liveness and offline queue depth
+      requestBody: { content: { application/json: { schema: { type: object, required: [scanner_id, booth_id, queue_depth], properties: { scanner_id: { type: string }, booth_id: { type: string }, queue_depth: { type: integer }, app_version: { type: string } } } } } }
+  /api/email/events:
+    post:
+      summary: Ticket email events from the email provider (requires x-webhook-token)
+  /api/booths:
+    get: { summary: Booths and locations }
+  /api/booths/health:
+    get: { summary: Per booth leads, consent, last lead, scanners and open anomalies }
+  /api/anomalies:
+    get: { summary: Open (or resolved) integrity anomalies with explanations }
+  /api/leads:
+    get: { summary: A booth's consented leads; q searches notes (semantic when configured) }
+  /api/leads/export.csv:
+    get: { summary: Consented leads as CSV for the sponsor }
+  /api/stats:
+    get: { summary: Check-ins, scans, per-minute desk throughput }
+  /api/signals:
+    post: { summary: Threat signals from check-in kiosks (kiosk/detect.py) }

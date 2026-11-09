@@ -10,9 +10,10 @@ resources:
   - deployment.yaml
   - service.yaml
   - httproute.yaml
-  - checkin.yaml
+  - ingest.yaml
+  - integrity.yaml
   - analysis-template.yaml
-  - ingest-job.yaml
+  - seed-job.yaml
 images:
   - name: app
     newName: ghcr.io/shivaylamba/overflow
