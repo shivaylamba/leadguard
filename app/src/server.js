@@ -259,7 +259,7 @@ if (ROLE === 'web') {
     const keyword = { bool: { filter, must: { match: { notes: { query: q, fuzziness: 'AUTO' } } } } };
     const semantic = { bool: { filter, must: { semantic: { field: 'notes_semantic', query: q } } } };
     const search = mode === 'hybrid'
-      ? { retriever: { rrf: { retrievers: [{ standard: { query: keyword } }, { standard: { query: semantic } }] } } }
+      ? { retriever: { rrf: { retrievers: [{ standard: { query: keyword } }, { standard: { query: semantic } }], rank_window_size: 50 } } }
       : mode === 'keyword' ? { query: keyword } : { query: { bool: { filter } }, sort: [{ last_seen: 'desc' }] };
     const r = await es().search({ index: INDEX.leads, size: 50, ...search, _source: { excludes: ['notes_semantic', 'scan_ids'] } });
     res.json({ mode, leads: r.hits.hits.map((h) => h._source) });
