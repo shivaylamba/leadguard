@@ -254,10 +254,15 @@ if (ROLE === 'web') {
     const booth = id(req.query.booth, 'booth');
     const q = String(req.query.q ?? '').trim().slice(0, 200);
     const filter = [{ term: { booth_id: booth } }, { term: { consent: true } }];
-    const query = q ? { bool: { filter, must: SEMANTIC ? { semantic: { field: 'notes_semantic', query: q } } : { match: { notes: q } } } } : { bool: { filter } };
-    t.annotate({ 'leadguard.booth.id': booth, 'leadguard.search.mode': q ? (SEMANTIC ? 'semantic' : 'keyword') : 'list' });
-    const r = await es().search({ index: INDEX.leads, size: 200, query, sort: q ? undefined : [{ last_seen: 'desc' }], _source: { excludes: ['notes_semantic', 'scan_ids'] } });
-    res.json({ leads: r.hits.hits.map((h) => h._source) });
+    const mode = q ? (SEMANTIC ? 'hybrid' : 'keyword') : 'list';
+    t.annotate({ 'leadguard.booth.id': booth, 'leadguard.search.mode': mode });
+    const keyword = { bool: { filter, must: { match: { notes: { query: q, fuzziness: 'AUTO' } } } } };
+    const semantic = { bool: { filter, must: { semantic: { field: 'notes_semantic', query: q } } } };
+    const search = mode === 'hybrid'
+      ? { retriever: { rrf: { retrievers: [{ standard: { query: keyword } }, { standard: { query: semantic } }] } } }
+      : mode === 'keyword' ? { query: keyword } : { query: { bool: { filter } }, sort: [{ last_seen: 'desc' }] };
+    const r = await es().search({ index: INDEX.leads, size: 50, ...search, _source: { excludes: ['notes_semantic', 'scan_ids'] } });
+    res.json({ mode, leads: r.hits.hits.map((h) => h._source) });
   }));
 
   // Consented leads only, as CSV for the sponsor.

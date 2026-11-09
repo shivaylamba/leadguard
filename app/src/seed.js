@@ -120,6 +120,9 @@ async function main(argv = process.argv) {
   const reset = argv.includes('--reset');
   const csv = argv.includes('--csv') ? argv[argv.indexOf('--csv') + 1] : null;
   for (const [name, body] of Object.entries(INDICES)) {
+    // A template too, so a write that races the seed (another pod writing first) still gets the
+    // right mapping instead of dynamic text fields.
+    await es().indices.putIndexTemplate({ name: `leadguard-${name}`, index_patterns: [name], priority: 400, template: { settings: body.settings, mappings: body.mappings } });
     const exists = await es().indices.exists({ index: name });
     if (exists && reset) await es().indices.delete({ index: name });
     // Two web pods may start together: "already exists" from the other one is fine.
