@@ -27,6 +27,9 @@ make down
 ```
 
 Verified on Docker Desktop (kernel 6.12): detection reported `cache`, 0.88 cores, `grind_nonce` 100% within ~75 s.
+The port and peer show up first; OBI attributes the process after it parses a request, which can take 1–2 minutes,
+so give the incident about two minutes before `make report` in a live demo. Findings without a known process are
+reported too.
 
 | URL | What |
 |---|---|

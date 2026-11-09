@@ -139,6 +139,7 @@ def detect():
         print(f"\n{RED}{BOLD}[{what}]{OFF} {BOLD}{WORKLOAD}:{port}  <-  {peer}{OFF}   {bps:,.0f} B/s   (OBI network flow)")
         if port not in own:
             print("   no process seen answering on this port yet; OBI picks it up on the next request")
+            report("new_port" if new_port else "new_peer", int(port), peer)  # worth reporting before we know who
             continue
         svc, pid = own[port]
         cores, funcs = profile(pid)
