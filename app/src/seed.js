@@ -145,11 +145,39 @@ async function main(argv = process.argv) {
   const booths = await bulk(INDEX.booths, BOOTHS, 'booth_id');
   const have = (await es().count({ index: INDEX.attendees })).count;
   const attendees = have && !reset && !csv ? 0 : await bulk(INDEX.attendees, csv ? fromCsv(csv) : synthetic(), 'badge_id');
-  console.log(JSON.stringify({ level: 'info', msg: 'seed done', booths, attendees_loaded: attendees, attendees_existing: have, semantic: SEMANTIC || null, reset }));
+  const ml = await ensureMlJob();
+  console.log(JSON.stringify({ level: 'info', msg: 'seed done', booths, attendees_loaded: attendees, attendees_existing: have, semantic: SEMANTIC || null, ml_job: ml, reset }));
 }
 
 if (require.main === module) {
   main().catch((err) => { console.error(JSON.stringify({ level: 'error', msg: err.message })); process.exit(1); });
+}
+
+// Elastic ML: learn each booth's normal scan rate and flag unusual drops (low_count per booth).
+// Optional: needs ML (trial/platinum, or a Serverless project that offers anomaly detection);
+// the rule-based silent-booth detector keeps working without it.
+const ML_JOB = 'leadguard-booth-scan-rate';
+async function ensureMlJob() {
+  if (process.env.ML_JOBS === 'false') return 'disabled';
+  try {
+    const have = await es().ml.getJobs({ job_id: ML_JOB }, { ignore: [404] });
+    if (!have.count) {
+      await es().ml.putJob({
+        job_id: ML_JOB,
+        description: 'LeadGuard: unusual drops in scans per booth (a scanner or booth silently losing leads)',
+        analysis_config: { bucket_span: '5m', detectors: [{ function: 'low_count', partition_field_name: 'booth_id', detector_description: 'scan rate drop per booth' }], influencers: ['booth_id'] },
+        data_description: { time_field: 'scanned_at' },
+        analysis_limits: { model_memory_limit: '32mb' },
+        datafeed_config: { datafeed_id: `datafeed-${ML_JOB}`, indices: [INDEX.scans], query: { match_all: {} } },
+      });
+    }
+    await es().ml.openJob({ job_id: ML_JOB }, { ignore: [409] });
+    const df = await es().ml.getDatafeedStats({ datafeed_id: `datafeed-${ML_JOB}` });
+    if (df.datafeeds?.[0]?.state !== 'started') await es().ml.startDatafeed({ datafeed_id: `datafeed-${ML_JOB}`, start: 'now-24h' });
+    return 'running';
+  } catch (err) {
+    return `unavailable (${(err.meta?.body?.error?.type || err.message).slice(0, 80)})`;
+  }
 }
 
 // Retry until Elasticsearch is reachable (first boot: the model may still be deploying).
@@ -163,4 +191,4 @@ async function ensure({ attempts = 30, delayMs = 10000 } = {}) {
   return false;
 }
 
-module.exports = { synthetic, BOOTHS, main, ensure };
+module.exports = { synthetic, BOOTHS, main, ensure, ML_JOB };

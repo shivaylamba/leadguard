@@ -79,7 +79,7 @@ test('anomaly ids are deterministic so re-detection never duplicates', () => {
   const a = { kind: 'never_checked_in', booth_id: 'dash0', badge_id: 'B20001' };
   assert.equal(m.anomalyId(a), m.anomalyId({ ...a }));
   assert.notEqual(m.anomalyId(a), m.anomalyId({ ...a, booth_id: 'sonar' }));
-  for (const k of ['never_checked_in', 'scanned_before_checkin', 'impossible_travel', 'silent_booth', 'scanner_offline', 'scans_not_syncing']) assert.ok(m.EXPLAIN[k]);
+  for (const k of ['never_checked_in', 'scanned_before_checkin', 'impossible_travel', 'silent_booth', 'scanner_offline', 'scans_not_syncing', 'scan_rate_anomaly']) assert.ok(m.EXPLAIN[k]);
 });
 
 test('ES|QL integrity query joins scans to check-ins', () => {

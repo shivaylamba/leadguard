@@ -9,7 +9,7 @@ const INTERVAL_S = Number(process.env.INTEGRITY_INTERVAL_S || 30);
 const WINDOW_MIN = Number(process.env.INTEGRITY_WINDOW_MIN || 240);
 // Re-evaluated every sweep: they clear when the condition does (the badge checks in late,
 // the booth scans again, the scanner syncs). impossible_travel is historical and stays open.
-const SELF_CLEARING = ['never_checked_in', 'scanned_before_checkin', 'silent_booth', 'scanner_offline', 'scans_not_syncing'];
+const SELF_CLEARING = ['never_checked_in', 'scanned_before_checkin', 'silent_booth', 'scanner_offline', 'scans_not_syncing', 'scan_rate_anomaly'];
 
 async function leadAnomalies() {
   const r = await es().esql.query({ query: m.integrityEsql(WINDOW_MIN) });
@@ -42,11 +42,21 @@ async function boothAnomalies() {
     .map((a) => ({ ...a, detail: { minutes_silent: a.minutes_silent, minutes_offline: a.minutes_offline, queue_depth: a.queue_depth } }));
 }
 
+// Elastic ML records for the per-booth scan-rate job (src/seed.js). Absent job = no ML anomalies.
+async function mlAnomalies() {
+  try {
+    const r = await es().ml.getRecords({ job_id: 'leadguard-booth-scan-rate', start: 'now-30m', record_score: 75, sort: 'record_score', desc: true }, { ignore: [404] });
+    return (r.records ?? []).map((x) => ({ kind: 'scan_rate_anomaly', booth_id: x.partition_field_value, detail: { score: Math.round(x.record_score), actual: x.actual?.[0], typical: Math.round((x.typical?.[0] ?? 0) * 10) / 10, bucket: new Date(x.timestamp).toISOString() } }));
+  } catch {
+    return [];
+  }
+}
+
 async function tick() {
   return t.inSpan('integrity sweep', {}, async (span) => {
     const boothsResp = await es().search({ index: INDEX.booths, size: 200 });
     const booths = Object.fromEntries(boothsResp.hits.hits.map((h) => [h._source.booth_id, h._source]));
-    const found = [...(await leadAnomalies()), ...(await travelAnomalies(booths)), ...(await boothAnomalies())];
+    const found = [...(await leadAnomalies()), ...(await travelAnomalies(booths)), ...(await boothAnomalies()), ...(await mlAnomalies())];
     const at = new Date().toISOString();
     const ops = [];
     for (const a of found) {

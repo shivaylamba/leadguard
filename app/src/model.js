@@ -187,6 +187,7 @@ const EXPLAIN = {
   silent_booth: 'Booth was scanning and has gone quiet: scanner app, battery or Wi-Fi. Leads are probably being lost.',
   scanner_offline: 'Scanner stopped reporting. Scans may be queued on the device.',
   scans_not_syncing: 'Scanner is online but has scans it cannot sync.',
+  scan_rate_anomaly: "Elastic ML: this booth's scan rate dropped well below what it learned as normal for this time.",
 };
 
 module.exports = {
