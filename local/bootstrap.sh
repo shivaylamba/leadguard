@@ -28,6 +28,8 @@ k apply -n argo-rollouts --server-side --force-conflicts -f "https://github.com/
 k apply --server-side -f "https://github.com/kubernetes-sigs/gateway-api/releases/download/${GATEWAY}/standard-install.yaml"
 # Like the Radar cluster: Argo CD watches Applications in team-* namespaces, project team-<team>.
 k -n argocd patch configmap argocd-cmd-params-cm --type merge -p '{"data":{"application.namespaces":"team-*"}}'
+# Like the Radar cluster: the inert HTTPRoute (no Gateway here) counts as healthy.
+k -n argocd patch configmap argocd-cm --type merge -p '{"data":{"resource.customizations.health.gateway.networking.k8s.io_HTTPRoute":"hs = {}\nhs.status = \"Healthy\"\nhs.message = \"no Gateway in this cluster; the platform routes the team URL\"\nreturn hs\n"}}'
 k -n argocd rollout restart deploy/argocd-server statefulset/argocd-application-controller >/dev/null
 
 k create namespace "team-$TEAM" --dry-run=client -o yaml | k apply -f -
