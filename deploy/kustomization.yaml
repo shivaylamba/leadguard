@@ -16,5 +16,5 @@ resources:
   - seed-job.yaml
 images:
   - name: app
-    newName: ghcr.io/shivaylamba/overflow
-    newTag: 6a86c97
+    newName: ghcr.io/shivaylamba/leadguard
+    newTag: d888a60
