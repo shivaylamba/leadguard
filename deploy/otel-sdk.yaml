@@ -15,3 +15,5 @@ data:
   OTEL_METRIC_EXPORT_INTERVAL: "15000"
   OTEL_RESOURCE_ATTRIBUTES: service.namespace=overflow,deployment.environment.name=cnh
   OTEL_NODE_DISABLED_INSTRUMENTATIONS: fs,dns,net
+  # No cloud metadata lookups (they time out off-cloud and log warnings).
+  OTEL_NODE_RESOURCE_DETECTORS: env,host,os,process,container

@@ -18,6 +18,7 @@ spec:
           command: ["node", "src/ingest.js"]
           env:
             - { name: OTEL_SERVICE_NAME, value: overflow-ingest }
+            - { name: ES_REQUEST_TIMEOUT_MS, value: "300000" }
             - name: ES_URL
               valueFrom: { secretKeyRef: { name: es-credentials, key: url } }
             - name: ES_API_KEY

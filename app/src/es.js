@@ -16,7 +16,9 @@ function es() {
   if (!client) {
     const node = process.env.ES_URL || 'http://localhost:9200';
     const apiKey = process.env.ES_API_KEY;
-    client = new Client({ node, ...(apiKey ? { auth: { apiKey } } : {}), requestTimeout: 5000 });
+    // Ingest can wait minutes on the first semantic_text write (the model deploys); requests stay short.
+    const requestTimeout = Number(process.env.ES_REQUEST_TIMEOUT_MS || 5000);
+    client = new Client({ node, ...(apiKey ? { auth: { apiKey } } : {}), requestTimeout });
   }
   return client;
 }
