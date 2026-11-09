@@ -88,7 +88,8 @@ test('ES|QL integrity query joins scans to check-ins', () => {
 });
 
 test('synthetic attendees are deterministic, unique and use example domains only', () => {
-  const a = synthetic(50), b = synthetic(50);
+  const now = Date.parse('2026-11-09T18:00:00Z');
+  const a = synthetic(50, now), b = synthetic(50, now);
   assert.deepEqual(a, b);
   assert.equal(new Set(a.map((x) => x.badge_id)).size, 50);
   assert.ok(a.every((x) => x.emails.every((e) => /@[a-z]+\.example$/.test(e))));

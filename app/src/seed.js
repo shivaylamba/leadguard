@@ -68,7 +68,7 @@ const BOOTHS = [
   ['radar', 'Radar', 1, 0], ['community', 'Community hub', 1, 1], ['demo', 'Demo booth', 1, 2],
 ].map(([booth_id, sponsor, row, col]) => ({ booth_id, sponsor, name: `${sponsor} booth`, location: { lat: 40.7631 + row * 0.00036, lon: -111.8962 + col * 0.00047 }, demo: true }));
 
-function synthetic(n = 400) {
+function synthetic(n = 400, now = Date.now()) {
   // Deterministic pseudo-random so every reset gives the same people.
   let seed = 42;
   const rnd = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648);
@@ -88,7 +88,7 @@ function synthetic(n = 400) {
       badge_id: `B${String(10001 + i)}`, order_id: `ORD-${String(50001 + Math.floor(i / 1.3))}`,
       name: `${f} ${l}`, emails: [`${local}@${domain}`], company,
       ticket_type: rnd() < 0.1 ? 'speaker' : rnd() < 0.15 ? 'sponsor' : 'attendee', needs_assistance: rnd() < 0.03,
-      ticket_email: { status, at: new Date(Date.now() - (status === 'sent' ? 30 : 48) * 3600000).toISOString(), detail },
+      ticket_email: { status, at: new Date(now - (status === 'sent' ? 30 : 48) * 3600000).toISOString(), detail },
       synthetic: true,
     });
   }
