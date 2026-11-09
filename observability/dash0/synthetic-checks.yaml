@@ -1,5 +1,5 @@
 # Dash0 synthetic checks: the public app, the desk lookup path, and the scanner sync path.
-# Replace <team> with the Radar team name (scripts/setup.sh does the same for deploy/).
+# Team shivaysree (Radar Cloud Native Hackathon cluster).
 apiVersion: dash0.com/v1alpha1
 kind: SyntheticCheck
 metadata:
@@ -7,7 +7,7 @@ metadata:
   labels:
     dash0.com/id: leadguard-readiness
 spec:
-  url: https://<team>.cnh.radarhq.io/readyz
+  url: https://shivaysree.cnh.radarhq.io/readyz
   interval: 60s
 ---
 apiVersion: dash0.com/v1alpha1
@@ -17,5 +17,5 @@ metadata:
   labels:
     dash0.com/id: leadguard-booth-health
 spec:
-  url: https://<team>.cnh.radarhq.io/api/booths/health
+  url: https://shivaysree.cnh.radarhq.io/api/booths/health
   interval: 60s

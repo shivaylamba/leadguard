@@ -1,13 +1,13 @@
 # Only for a cluster you bring (not the one the hackathon gives you): an Argo CD
 # Application in the argocd namespace using the default project, deploying
-# deploy/ into team-overflow (created if missing). Your cluster needs Argo CD
+# deploy/ into team-shivaysree (created if missing). Your cluster needs Argo CD
 # (and Argo Rollouts for examples/canary). Remove httproute.yaml from
 # deploy/kustomization.yaml first: it points at the hackathon's gateway.
 #   kubectl apply -f argocd/application-byo.yaml
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: app-overflow
+  name: app-shivaysree
   namespace: argocd
 spec:
   project: default
@@ -17,7 +17,7 @@ spec:
     path: deploy
   destination:
     server: https://kubernetes.default.svc
-    namespace: team-overflow
+    namespace: team-shivaysree
   syncPolicy:
     automated:
       prune: true
