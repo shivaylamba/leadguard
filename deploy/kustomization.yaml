@@ -16,4 +16,4 @@ resources:
 images:
   - name: app
     newName: ghcr.io/shivaylamba/leadguard
-    newTag: "1eff0da"
+    newTag: "3eab57b"
