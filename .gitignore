@@ -10,3 +10,5 @@ node_modules/
 npm-debug.log*
 .DS_Store
 workspace/.aura/aura.log
+kiosk/baseline.json
+kiosk/__pycache__/

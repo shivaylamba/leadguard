@@ -317,6 +317,11 @@ if (ROLE === 'web') {
     });
   }));
 
+  app.get('/api/signals', wrap(async (_req, res) => {
+    const r = await es().search({ index: INDEX.signals, size: 20, ignore_unavailable: true, sort: [{ '@timestamp': 'desc' }] });
+    res.json({ signals: r.hits.hits.map((h) => h._source) });
+  }));
+
   // Threat signals from the check-in kiosks (kiosk/detect.py).
   app.post('/api/signals', wrap(async (req, res) => {
     const b = req.body ?? {};

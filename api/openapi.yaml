@@ -79,4 +79,5 @@ paths:
   /api/ops/drafts/{id}/approve:
     post: { summary: An organizer approves a draft (nothing is sent without this) }
   /api/signals:
+    get: { summary: Recent kiosk threat signals }
     post: { summary: Threat signals from check-in kiosks (kiosk/detect.py) }

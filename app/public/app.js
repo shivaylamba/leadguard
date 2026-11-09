@@ -179,7 +179,8 @@
     main.innerHTML = '<h2>Organizer</h2><div id="stats" class="row"></div>' +
       '<form id="ask" class="card"><label for="aq"><strong>Ask ops</strong> (AI SRE: AURA on Kimi K3.1 Pro)</label><div class="row"><input id="aq" placeholder="What happened at the Radar booth in the last hour?" autocomplete="off">' +
       '<button class="primary">Ask</button></div><div id="answer" class="meta" aria-live="polite"></div></form><div id="drafts"></div>' +
-      '<h3>Booths</h3><div id="booths" class="grid"></div><h3>Anomalies</h3><div id="anoms"></div><h3>Tickets at risk</h3><div id="risk"></div>';
+      '<h3>Booths</h3><div id="booths" class="grid"></div><h3>Anomalies</h3><div id="anoms"></div><h3>Tickets at risk</h3><div id="risk"></div>' +
+      '<h3>Check-in kiosk security</h3><p class="meta">eBPF on the kiosks (OBI network flows + CPU profiles). No detection rules: anything new is flagged.</p><div id="sigs"></div>';
     document.getElementById('ask').addEventListener('submit', function (e) {
       e.preventDefault();
       var q = document.getElementById('aq').value.trim(); if (!q) return;
@@ -214,6 +215,12 @@
         document.getElementById('anoms').innerHTML = r.anomalies.length ? '<table><thead><tr><th>What</th><th>Where</th><th>Why it matters</th><th>Since</th></tr></thead><tbody>' + r.anomalies.map(function (a) {
           return '<tr><td><strong>' + esc(a.kind.replace(/_/g, ' ')) + '</strong>' + (a.badge_id ? '<div class="meta">' + esc(a.badge_id) + '</div>' : '') + '</td><td>' + esc(a.booth_id || '') + (a.scanner_id ? '<div class="meta">' + esc(a.scanner_id) + '</div>' : '') + '</td><td>' + esc(a.explain) + '</td><td>' + time(a.first_detected) + '</td></tr>';
         }).join('') + '</tbody></table>' : '<p class="ok">No open anomalies.</p>';
+      });
+      api('/api/signals').then(function (r) {
+        document.getElementById('sigs').innerHTML = r.signals.length ? '<table><tbody>' + r.signals.slice(0, 8).map(function (x) {
+          return '<tr><td><strong>' + esc(x.kind.replace(/_/g, ' ')) + '</strong><div class="meta">' + esc(x.kiosk_id) + ' · ' + time(x['@timestamp']) + '</div></td><td>' +
+            (x.port ? 'port ' + esc(x.port) : '') + (x.peer ? ' ← ' + esc(x.peer) : '') + (x.process ? '<div class="meta">process ' + esc(x.process) + (x.cpu_cores ? ', ' + esc(x.cpu_cores) + ' cores' : '') + (x.top_function ? ', hot: ' + esc(x.top_function) : '') + '</div>' : '') + '</td></tr>';
+        }).join('') + '</tbody></table>' : '<p class="ok">Nothing new on the kiosks.</p>';
       });
       api('/api/attendees/at-risk').then(function (r) {
         document.getElementById('risk').innerHTML = r.attendees.length ? '<p class="meta">Not checked in, and their ticket email may not have arrived. Reach them another way before they reach the desk.</p><table><tbody>' +
