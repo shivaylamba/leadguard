@@ -180,15 +180,28 @@
   function ops() {
     main.innerHTML = '<h2>Organizer</h2><div id="stats" class="row"></div>' +
       '<form id="ask" class="card"><label for="aq"><strong>Ask ops</strong> (AI SRE: AURA on Kimi K3.1 Pro)</label><div class="row"><input id="aq" placeholder="What happened at the Radar booth in the last hour?" autocomplete="off">' +
-      '<button class="primary">Ask</button></div><div id="answer" class="meta" aria-live="polite"></div></form><div id="drafts"></div>' +
+      '<button class="primary">Ask</button></div><p id="asking" class="meta" aria-hidden="true"></p><div id="answer"></div></form><div id="drafts"></div>' +
       '<h3>Booths</h3><div id="booths" class="grid"></div><h3>Anomalies</h3><div id="anoms"></div><h3>Tickets at risk</h3><div id="risk"></div>' +
       '<h3>Check-in kiosk security</h3><p class="meta">eBPF on the kiosks (OBI network flows + CPU profiles). No detection rules: anything new is flagged.</p><div id="sigs"></div>';
     document.getElementById('ask').addEventListener('submit', function (e) {
       e.preventDefault();
       var q = document.getElementById('aq').value.trim(); if (!q) return;
-      var out = document.getElementById('answer'); out.textContent = 'Investigating…';
-      post('/api/ops/ask', { question: q }).then(function (r) { out.innerHTML = '<div style="white-space:pre-wrap">' + md(r.answer) + '</div>'; window.rum.event('ops_ask', {}); drafts(); })
-        .catch(function (err) { out.textContent = 'The assistant is unavailable: ' + err.message; });
+      // The answer takes up to a minute or two: start the job, then poll for it. Screen readers hear
+      // "Investigating" once and the outcome once (via #live); the ticking counter is aria-hidden.
+      var out = document.getElementById('answer'), asking = document.getElementById('asking');
+      out.textContent = ''; asking.textContent = 'Investigating…'; say('Investigating your question');
+      var started = Date.now();
+      var poll = function (id) {
+        return api('/api/ops/ask/' + encodeURIComponent(id)).then(function (r) {
+          if (r.status === 'answered') { asking.textContent = ''; out.innerHTML = '<div style="white-space:pre-wrap">' + md(r.answer) + '</div>'; say('Answer ready'); window.rum.event('ops_ask', {}); drafts(); return; }
+          if (r.status === 'failed') throw new Error(r.error || 'failed');
+          if (Date.now() - started > 240000) throw new Error('no answer after 4 minutes');
+          asking.textContent = 'Investigating… ' + Math.round((Date.now() - started) / 1000) + ' s';
+          return new Promise(function (ok) { setTimeout(ok, 2500); }).then(function () { return poll(id); });
+        });
+      };
+      post('/api/ops/ask', { question: q }).then(function (r) { return poll(r.id); })
+        .catch(function (err) { asking.textContent = ''; out.textContent = 'The assistant is unavailable: ' + err.message; say('The assistant is unavailable'); });
     });
     function drafts() {
       api('/api/ops/drafts').then(function (r) {

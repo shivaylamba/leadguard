@@ -52,6 +52,9 @@ const INDICES = {
       },
     },
   },
+  // Ask-ops jobs: the answer can take a minute, longer than a gateway will hold a request open.
+  // The question itself is not stored.
+  ops_asks: { mappings: { properties: { status: { type: 'keyword' }, answer: { type: 'text', index: false }, error: { type: 'keyword' }, created_at: { type: 'date' }, answered_at: { type: 'date' } } } },
   drafts: { mappings: { properties: { booth_id: { type: 'keyword' }, subject: { type: 'text' }, body: { type: 'text' }, status: { type: 'keyword' }, author: { type: 'keyword' }, created_at: { type: 'date' }, approved_at: { type: 'date' } } } },
   [INDEX.signals]: { mappings: { properties: { '@timestamp': { type: 'date' }, kiosk_id: { type: 'keyword' }, kind: { type: 'keyword' }, port: { type: 'integer' }, peer: { type: 'keyword' }, process: { type: 'keyword' }, cpu_cores: { type: 'float' }, top_function: { type: 'keyword' } } } },
 };
