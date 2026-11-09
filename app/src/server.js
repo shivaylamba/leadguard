@@ -48,7 +48,9 @@ async function roomsById() {
 
 async function occupancy() {
   const since = new Date(Date.now() - WINDOW_MIN * 60000).toISOString();
-  return t.inSpan('occupancy lookup', {}, async () => q.occupancyFromAgg(await es().search({ index: INDEX.checkins, ...q.occupancyAgg(since) })));
+  // ignore_unavailable: before the first check-in there's nothing to count, which is zero, not an error.
+  return t.inSpan('occupancy lookup', {}, async () =>
+    q.occupancyFromAgg(await es().search({ index: INDEX.checkins, ignore_unavailable: true, ...q.occupancyAgg(since) })));
 }
 
 // ── check-in (ROLE=checkin serves it; web proxies) ─────────────────────────

@@ -77,6 +77,8 @@ async function ensureCheckinStream(reset) {
     },
   });
   if (reset) await es().indices.deleteDataStream({ name: INDEX.checkins }, { ignore: [404] });
+  // Create it now so reads work before the first check-in.
+  await es().indices.createDataStream({ name: INDEX.checkins }, { ignore: [400] }); // 400 = already exists
 }
 
 function withTimes(sessions) {
