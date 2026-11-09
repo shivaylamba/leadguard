@@ -1,0 +1,27 @@
+:root { --bg:#0b0f17; --panel:#141b27; --line:#263041; --fg:#f2f5fa; --dim:#a7b1c2; --acc:#5eead4; --warn:#fbbf24; --bad:#f87171; }
+@media (prefers-color-scheme: light) { :root { --bg:#f7f8fa; --panel:#fff; --line:#d5dbe5; --fg:#0f172a; --dim:#475569; --acc:#0f766e; --warn:#a16207; --bad:#b91c1c; } }
+* { box-sizing: border-box; }
+body { margin:0; background:var(--bg); color:var(--fg); font:17px/1.5 system-ui, -apple-system, Segoe UI, sans-serif; }
+body.large { font-size: 21px; }
+header, main, footer { max-width: 880px; margin: 0 auto; padding: 16px; }
+h1 { margin: 0; font-size: 1.6em; } h1 a { color: var(--fg); text-decoration: none; }
+.tag { margin: 2px 0 10px; color: var(--dim); }
+nav { display:flex; gap:16px; flex-wrap:wrap; } nav a, a { color: var(--acc); }
+a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid var(--acc); outline-offset: 2px; }
+form.search { display:flex; gap:8px; flex-wrap:wrap; margin: 8px 0 16px; }
+input[type=search] { flex:1 1 280px; padding:12px; font-size:1em; border-radius:10px; border:2px solid var(--line); background:var(--panel); color:var(--fg); }
+button, select { padding:10px 14px; font-size:1em; border-radius:10px; border:2px solid var(--line); background:var(--panel); color:var(--fg); cursor:pointer; }
+button.primary { background: var(--acc); color: #04201c; border-color: var(--acc); font-weight: 700; }
+.card { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:14px 16px; margin: 10px 0; }
+.card h3 { margin: 0 0 4px; font-size: 1.1em; }
+.meta { color: var(--dim); font-size: .92em; }
+.badge { display:inline-block; padding:1px 8px; border-radius:999px; border:1px solid var(--line); font-size:.85em; margin-right:6px; }
+.full { color: var(--bad); font-weight: 700; } .busy { color: var(--warn); font-weight: 700; } .ok { color: var(--acc); font-weight: 700; }
+.grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+.bar { height: 10px; border-radius: 5px; background: var(--line); overflow: hidden; margin-top: 8px; }
+.bar > span { display:block; height:100%; background: var(--acc); }
+.bar.busy > span { background: var(--warn); } .bar.full > span { background: var(--bad); }
+label { display:flex; gap:10px; align-items:center; margin: 10px 0; }
+.skip { position:absolute; left:-999px; } .skip:focus { left: 8px; top: 8px; background: var(--panel); padding: 8px; }
+.sr-only { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); }
+footer { color: var(--dim); font-size: .85em; }

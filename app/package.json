@@ -1,10 +1,22 @@
 {
-  "name": "cnh-starter",
-  "version": "1.0.0",
+  "name": "overflow",
+  "version": "0.1.0",
   "private": true,
-  "description": "Starter app for the Radar AI SRE track at the Cloud Native Hackathon",
-  "main": "server.js",
+  "description": "Overflow: room full? here's the talk next door",
+  "main": "src/server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node --require @opentelemetry/auto-instrumentations-node/register src/server.js",
+    "ingest": "node src/ingest.js",
+    "test": "node --test",
+    "lint": "node --check src/server.js && node --check src/queries.js && node --check src/ingest.js && node --check src/es.js && node --check src/telemetry.js && node --check public/app.js && node --check public/rum.js"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@elastic/elasticsearch": "^9.5.1",
+    "@opentelemetry/api": "^1.10.0",
+    "@opentelemetry/auto-instrumentations-node": "^0.83.0",
+    "express": "^5.3.0"
   }
 }

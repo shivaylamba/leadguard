@@ -1,0 +1,32 @@
+# Judge the checkin canary on ITS OWN pods (pod name = checkin-<pod-template-hash>-<id>),
+# not service-wide, so a regression on half the traffic isn't diluted by stable pods.
+# Too little traffic is inconclusive, never a pass.
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: checkin-health
+spec:
+  args:
+    - name: canary-hash
+    - name: prometheus
+      value: http://prometheus-server.monitoring
+  metrics:
+    - name: checkin-error-rate
+      interval: 30s
+      count: 4
+      failureLimit: 1
+      inconclusiveLimit: 3
+      successCondition: len(result) > 0 && result[0] < 0.01
+      failureCondition: len(result) > 0 && result[0] >= 0.01
+      provider:
+        prometheus:
+          address: "{{args.prometheus}}"
+          query: |
+            (
+              sum(rate(http_server_duration_count{pod=~"checkin-{{args.canary-hash}}-.*", http_route="/api/checkin", http_status_code=~"5.."}[2m]))
+              or vector(0)
+            )
+            /
+            sum(rate(http_server_duration_count{pod=~"checkin-{{args.canary-hash}}-.*", http_route="/api/checkin"}[2m]))
+            and
+            sum(increase(http_server_duration_count{pod=~"checkin-{{args.canary-hash}}-.*", http_route="/api/checkin"}[2m])) > 5

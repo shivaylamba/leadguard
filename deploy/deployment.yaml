@@ -1,3 +1,4 @@
+# web role: UI + read APIs. Service app:80 (the team URL) points here.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -5,8 +6,6 @@ metadata:
   labels:
     app: app
 spec:
-  # Remove this line when you turn on the HPA (examples/hpa), or Argo CD and
-  # the autoscaler will keep resetting each other.
   replicas: 2
   selector:
     matchLabels:
@@ -15,6 +14,9 @@ spec:
     metadata:
       labels:
         app: app
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9464"
     spec:
       containers:
         - name: app
@@ -22,30 +24,35 @@ spec:
           ports:
             - name: http
               containerPort: 8080
+            - name: metrics
+              containerPort: 9464
           env:
-            - name: TEAM_NAME
-              value: "__TEAM__"
+            - { name: ROLE, value: web }
+            - { name: OTEL_SERVICE_NAME, value: overflow-web-api }
+            - { name: TEAM_NAME, value: "overflow" }
+            - { name: CHECKIN_URL, value: "http://checkin" }
+            - { name: COLLECTOR_HTTP, value: "http://otel-collector:4318" }
+            - name: ES_URL
+              valueFrom: { secretKeyRef: { name: es-credentials, key: url } }
+            - name: ES_API_KEY
+              valueFrom: { secretKeyRef: { name: es-credentials, key: api-key, optional: true } }
+            - name: SEMANTIC_INFERENCE_ID
+              valueFrom: { secretKeyRef: { name: es-credentials, key: semantic-inference-id, optional: true } }
+            - name: PSEUDONYM_SALT
+              valueFrom: { secretKeyRef: { name: app-credentials, key: pseudonym-salt, optional: true } }
+          envFrom:
+            - configMapRef: { name: otel-sdk }
           resources:
-            requests:
-              cpu: 100m
-              memory: 128Mi
-            limits:
-              cpu: 500m
-              memory: 256Mi
+            requests: { cpu: 150m, memory: 192Mi }
+            limits: { cpu: 500m, memory: 384Mi }
           readinessProbe:
-            httpGet:
-              path: /readyz
-              port: http
+            httpGet: { path: /readyz, port: http }
             periodSeconds: 5
           livenessProbe:
-            httpGet:
-              path: /healthz
-              port: http
+            httpGet: { path: /healthz, port: http }
             periodSeconds: 10
           securityContext:
             runAsNonRoot: true
             allowPrivilegeEscalation: false
-            seccompProfile:
-              type: RuntimeDefault
-            capabilities:
-              drop: ["ALL"]
+            seccompProfile: { type: RuntimeDefault }
+            capabilities: { drop: ["ALL"] }

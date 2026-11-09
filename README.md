@@ -1,3 +1,27 @@
+# Overflow: room full? Here's the talk next door.
+
+Cloud Native Hackathon 2026 (WeMakeDevs). Attendees check in to a room by scanning its QR code; organizers see live
+occupancy; when a room fills, attendees get the most similar talk starting now in a room with seats, filtered by their
+accessibility needs. Full plan and technical spec: [`docs/plan.md`](docs/plan.md).
+
+| Piece | Where |
+|---|---|
+| App (one Node 22 image, `ROLE=web` / `ROLE=checkin`) | `app/` (`src/server.js`, `src/queries.js`, `src/ingest.js`, `public/`) |
+| Elasticsearch: the only data store | `app/src/es.js`, mappings in `app/src/ingest.js` |
+| OpenTelemetry: SDK auto-instrumentation, product attributes, browser RUM, Collector | `app/src/telemetry.js`, `app/public/rum.js`, `deploy/otel-*.yaml` |
+| Kubernetes, deployed by Argo CD; `checkin` is a canary with analysis on its own pods | `deploy/` |
+| Gitar review instructions, rules, auto-apply | `.gitar/` |
+| Local stand-ins on the Civo VM (Elasticsearch, LGTM for Dash0, Prometheus, Argo) | `local/` |
+
+**The schedule is sample data** (`app/data/*.json`, every record marked `sample: true`) until it is replaced by the
+published KubeCon schedule.
+
+Dev loop: `cd app && npm ci && npm test`. Run against a local Elasticsearch: `ES_URL=http://localhost:9200 npm run ingest && npm start`.
+
+---
+
+# Radar starter (original README)
+
 # Radar AI SRE track starter: Cloud Native Hackathon
 
 Start here if your team has its own cluster at the hackathon: a virtual Kubernetes cluster (vcluster) where you're cluster-admin. You get a small app that `git push` deploys through Argo CD, and notes your coding agent reads so it ships through [Radar](https://radarhq.io)'s MCP server. Below is a menu of what Radar can do: pick what your project needs.

@@ -1,0 +1,17 @@
+# OpenTelemetry SDK settings shared by every Node pod (auto-instrumentation reads OTEL_*).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: otel-sdk
+data:
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+  OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+  OTEL_TRACES_EXPORTER: otlp
+  # otlp → Collector → Dash0; prometheus on :9464 → in-cluster Prometheus → canary analysis
+  OTEL_METRICS_EXPORTER: otlp,prometheus
+  OTEL_EXPORTER_PROMETHEUS_HOST: 0.0.0.0
+  OTEL_EXPORTER_PROMETHEUS_PORT: "9464"
+  OTEL_LOGS_EXPORTER: otlp
+  OTEL_METRIC_EXPORT_INTERVAL: "15000"
+  OTEL_RESOURCE_ATTRIBUTES: service.namespace=overflow,deployment.environment.name=cnh
+  OTEL_NODE_DISABLED_INSTRUMENTATIONS: fs,dns,net

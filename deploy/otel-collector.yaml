@@ -1,0 +1,164 @@
+# One Collector (Deployment, no host access: the Radar cluster refuses it).
+#   in:  OTLP from every pod and the browser (via the web role's /otlp proxy)
+#   do:  k8s attributes, hash anything that looks like a raw device id, product metrics
+#   out: OTLP to the backend in Secret otlp-backend (Dash0 in the hackathon; local LGTM on Civo)
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: otel-collector
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: overflow-otel-collector
+rules:
+  - apiGroups: [""]
+    resources: [pods, namespaces, nodes]
+    verbs: [get, list, watch]
+  - apiGroups: [apps]
+    resources: [replicasets, deployments]
+    verbs: [get, list, watch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: overflow-otel-collector
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: overflow-otel-collector
+subjects:
+  - kind: ServiceAccount
+    name: otel-collector
+    namespace: team-overflow
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: otel-collector
+data:
+  config.yaml: |
+    receivers:
+      otlp:
+        protocols:
+          grpc: { endpoint: 0.0.0.0:4317 }
+          http: { endpoint: 0.0.0.0:4318 }
+    processors:
+      memory_limiter: { check_interval: 2s, limit_percentage: 80, spike_limit_percentage: 20 }
+      k8sattributes:
+        auth_type: serviceAccount
+        extract:
+          metadata: [k8s.namespace.name, k8s.pod.name, k8s.deployment.name, k8s.replicaset.name, container.image.tag]
+          labels:
+            - { tag_name: k8s.pod.label.rollouts_pod_template_hash, key: rollouts-pod-template-hash, from: pod }
+        pod_association:
+          - sources: [{ from: connection }]
+      # Product dimensions + privacy. No raw device ids leave the cluster (Gitar: .gitar/review/otel.md).
+      transform/product:
+        error_mode: ignore
+        trace_statements:
+          - delete_key(span.attributes, "device_id")
+        log_statements:
+          - delete_key(log.attributes, "device_id")
+      batch: {}
+    connectors:
+      spanmetrics:
+        histogram:
+          explicit: { buckets: [5ms, 10ms, 25ms, 50ms, 100ms, 250ms, 500ms, 1s, 2.5s] }
+        dimensions:
+          - name: http.route
+          - name: http.response.status_code
+          - name: conference.room.id
+          - name: search.mode
+          - name: k8s.pod.label.rollouts_pod_template_hash
+        metrics_flush_interval: 15s
+      count:
+        logs:
+          overflow.ui.events:
+            description: Browser events (search, checkin, overflow_shown, prefs_saved, navigate)
+            conditions: ['attributes["overflow.ui.action"] != nil']
+            attributes:
+              - key: overflow.ui.action
+          overflow.ui.zero_results:
+            description: Searches that found nothing (attendees looking for talks we don't have)
+            conditions: ['attributes["overflow.ui.action"] == "search" and attributes["search.zero_results"] == true']
+    exporters:
+      otlp/backend:
+        endpoint: ${env:OTLP_BACKEND_ENDPOINT}
+        tls:
+          insecure: ${env:OTLP_BACKEND_INSECURE}
+        headers:
+          Authorization: Bearer ${env:OTLP_BACKEND_TOKEN}
+      debug: { verbosity: basic }
+    service:
+      telemetry:
+        logs: { level: info }
+      pipelines:
+        traces:
+          receivers: [otlp]
+          processors: [memory_limiter, k8sattributes, transform/product, batch]
+          exporters: [otlp/backend, spanmetrics]
+        metrics:
+          receivers: [otlp, spanmetrics, count]
+          processors: [memory_limiter, k8sattributes, batch]
+          exporters: [otlp/backend]
+        logs:
+          receivers: [otlp]
+          processors: [memory_limiter, k8sattributes, transform/product, batch]
+          exporters: [otlp/backend, count]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: otel-collector
+  labels:
+    app: otel-collector
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: otel-collector
+  template:
+    metadata:
+      labels:
+        app: otel-collector
+    spec:
+      serviceAccountName: otel-collector
+      containers:
+        - name: otel-collector
+          image: otel/opentelemetry-collector-contrib:0.165.0
+          args: ["--config=/conf/config.yaml"]
+          env:
+            - name: OTLP_BACKEND_ENDPOINT
+              valueFrom: { secretKeyRef: { name: otlp-backend, key: endpoint } }
+            - name: OTLP_BACKEND_TOKEN
+              valueFrom: { secretKeyRef: { name: otlp-backend, key: token } }
+            - name: OTLP_BACKEND_INSECURE
+              valueFrom: { secretKeyRef: { name: otlp-backend, key: insecure } }
+          ports:
+            - { name: otlp-grpc, containerPort: 4317 }
+            - { name: otlp-http, containerPort: 4318 }
+          volumeMounts:
+            - { name: conf, mountPath: /conf }
+          resources:
+            requests: { cpu: 100m, memory: 192Mi }
+            limits: { cpu: 500m, memory: 512Mi }
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            seccompProfile: { type: RuntimeDefault }
+            capabilities: { drop: ["ALL"] }
+      volumes:
+        - name: conf
+          configMap: { name: otel-collector }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: otel-collector
+spec:
+  selector:
+    app: otel-collector
+  ports:
+    - { name: otlp-grpc, port: 4317, targetPort: otlp-grpc }
+    - { name: otlp-http, port: 4318, targetPort: otlp-http }

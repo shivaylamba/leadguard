@@ -9,3 +9,4 @@
 node_modules/
 npm-debug.log*
 .DS_Store
+workspace/.aura/aura.log

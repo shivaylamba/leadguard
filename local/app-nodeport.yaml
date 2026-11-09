@@ -1,0 +1,8 @@
+# Local only: expose Service app on the kind node (Radar routes its own URL instead).
+apiVersion: v1
+kind: Service
+metadata: { name: app-local, namespace: team-overflow }
+spec:
+  type: NodePort
+  selector: { app: app }
+  ports: [{ name: http, port: 80, targetPort: http, nodePort: 30080 }]

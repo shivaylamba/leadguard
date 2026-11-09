@@ -3,11 +3,16 @@
 # by hand.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
-namespace: team-__TEAM__
+namespace: team-overflow
 resources:
+  - otel-sdk.yaml
+  - otel-collector.yaml
   - deployment.yaml
   - service.yaml
   - httproute.yaml
+  - checkin.yaml
+  - analysis-template.yaml
+  - ingest-job.yaml
 images:
   - name: app
     newName: ghcr.io/shivaylamba/overflow
