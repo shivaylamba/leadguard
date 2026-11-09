@@ -1,0 +1,27 @@
+# Civo only: the "dry run a month out". Desks, booths and scanners at a low, steady rate,
+# so the ingest canary always has traffic to judge (no traffic = inconclusive = paused).
+# Never in deploy/: at the hackathon, real people generate the traffic.
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: dry-run, namespace: team-overflow, labels: { app: dry-run } }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: dry-run } }
+  template:
+    metadata: { labels: { app: dry-run } }
+    spec:
+      containers:
+        - name: dry-run
+          image: ghcr.io/shivaylamba/leadguard:latest
+          imagePullPolicy: Always
+          command: ["node", "src/simulate.js", "--base", "http://app.team-overflow", "--minutes", "100000", "--rate", "0.3"]
+          env:
+            - { name: OTEL_SDK_DISABLED, value: "true" }
+          resources:
+            requests: { cpu: 20m, memory: 64Mi }
+            limits: { cpu: 200m, memory: 128Mi }
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            seccompProfile: { type: RuntimeDefault }
+            capabilities: { drop: ["ALL"] }
