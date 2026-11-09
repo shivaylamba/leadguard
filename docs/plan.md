@@ -154,16 +154,23 @@ Booth and scanner anomalies clear themselves when fixed; lead anomalies wait for
 
 ## 5. Status: built and running on the Civo stand-in cluster
 
-- `app/`: one Node 22 image with three roles (web, ingest, integrity), plus `seed.js` (run at web start-up) and `simulate.js`. 17 unit and contract tests.
-- `deploy/`: web, ingest Rollout + analysis, integrity, Collector, OTel SDK config. There's no PostSync hook: it would wait on a paused canary and block every later deploy.
-- `local/`: a kind cluster on the Civo VM with Argo CD, Rollouts, Gateway CRDs, Prometheus (`monitoring/prometheus-server`), Elasticsearch 9.5.6 (trial, multilingual E5) and LGTM standing in for Dash0.
-- `.gitar/`: review instructions, rules, auto-apply. `.github/workflows/ci.yaml`: lint, tests, kubeconform.
+- **App** (`app/`): one Node 22 image with three roles (web, ingest, integrity); `seed.js` (run at web start-up) and `simulate.js` (rehearsals, `--offline <booth>`). 18 unit and contract tests.
+- **Deploy** (`deploy/`):
+  - the web Deployment, the ingest Rollout (canary analysis on its own pods, verified passing on real traffic), the integrity worker, the Collector and the OTel SDK config;
+  - **`ops.yaml`: AURA** (Kimi K3.1 Pro on Token Factory) with LeadGuard's MCP endpoint (`/mcp`, bearer token, evidence without personal data), plus approval-gated sponsor drafts. Verified: after a rehearsed 3-minute Sonar scanner outage, AURA answered "22 scans made offline … all synced late, max delay 3 minutes; 0 queued; no leads lost";
+  - no PostSync hook: it would wait on a paused canary and block every later deploy.
+- **Observability** (`observability/`): the Dash0 dashboard (Perses), check rules, SLOs and synthetic checks. `check.py` ran every query against the live Prometheus (no errors).
+- **Local stand-ins** (`local/`): a kind cluster on the Civo VM with Argo CD, Rollouts, Gateway CRDs, Prometheus (`monitoring/prometheus-server`), Elasticsearch 9.5.6 (trial, multilingual E5), LGTM standing in for Dash0, and steady dry-run traffic.
+- **Review and CI:** `.gitar/` review instructions, rules and auto-apply; `.github/workflows/ci.yaml` runs lint, tests and kubeconform.
 
 **Swap to the real accounts on the day:**
-- **Elastic Serverless:** Secret `es-credentials` (`url`, `api-key`, `semantic-inference-id`).
-- **Dash0:** Secret `otlp-backend` (`endpoint`, `token`, `insecure=false`).
-- **Gitar:** install the GitHub App.
-- **Radar:** `scripts/setup.sh <team>`, then apply `argocd/application.yaml` via Radar MCP.
+
+| Account | What to change |
+|---|---|
+| Elastic Serverless | Secret `es-credentials` (`url`, `api-key`, `semantic-inference-id`) |
+| Dash0 | Secret `otlp-backend` (`endpoint`, `token`, `insecure=false`); then `dash0 apply -f observability/dash0/` |
+| Gitar | Install the GitHub App |
+| Radar | `scripts/setup.sh <team>`, then apply `argocd/application.yaml` via Radar MCP; create Secret `nebius-credentials` there too |
 
 ## 6. Demo (3 minutes, live, with the judges)
 
