@@ -9,6 +9,8 @@
   var api = function (p, opts) { return fetch(p, opts).then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.error || r.status); return j; }); }); };
   var post = function (p, body) { return api(p, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }); };
   var say = function (msg) { live.textContent = msg; };
+  // Just enough markdown for the assistant's answers: escape first, then **bold** and `code`.
+  var md = function (text) { return esc(text).replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>').replace(/`([^`]+)`/g, '<code>$1</code>'); };
   var timers = [];
   var every = function (fn, ms) { fn(); timers.push(setInterval(fn, ms)); };
 
@@ -185,7 +187,7 @@
       e.preventDefault();
       var q = document.getElementById('aq').value.trim(); if (!q) return;
       var out = document.getElementById('answer'); out.textContent = 'Investigating…';
-      post('/api/ops/ask', { question: q }).then(function (r) { out.innerHTML = '<div style="white-space:pre-wrap">' + esc(r.answer) + '</div>'; window.rum.event('ops_ask', {}); drafts(); })
+      post('/api/ops/ask', { question: q }).then(function (r) { out.innerHTML = '<div style="white-space:pre-wrap">' + md(r.answer) + '</div>'; window.rum.event('ops_ask', {}); drafts(); })
         .catch(function (err) { out.textContent = 'The assistant is unavailable: ' + err.message; });
     });
     function drafts() {

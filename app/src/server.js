@@ -210,7 +210,8 @@ if (ROLE === 'web') {
   app.get('/api/attendees/at-risk', wrap(async (_req, res) => {
     const r = await es().search({
       index: INDEX.attendees, size: 200,
-      query: { bool: { should: [{ terms: { 'ticket_email.status': ['bounced', 'complained', 'sent'] } }, { bool: { must_not: { exists: { field: 'ticket_email.status' } } } }], minimum_should_match: 1 } },
+      // Walk-ups got their badge at the desk, so a missing ticket email isn't a risk for them.
+      query: { bool: { should: [{ terms: { 'ticket_email.status': ['bounced', 'complained', 'sent'] } }, { bool: { must_not: { exists: { field: 'ticket_email.status' } } } }], minimum_should_match: 1, must_not: [{ term: { ticket_type: 'walk-up' } }] } },
     });
     const ids = r.hits.hits.map((h) => h._id);
     const seen = ids.length ? await es().mget({ index: INDEX.checkedIn, ids }) : { docs: [] };
