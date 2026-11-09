@@ -6,7 +6,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 NAME=overflow CTX=kind-overflow TEAM=overflow
-ARGOCD=v3.6.1 ROLLOUTS=v1.10.2 GATEWAY=v1.7.0
+ARGOCD=v3.6.1 ROLLOUTS=v1.10.2 GATEWAY=v1.7.0 METRICS=v0.9.1
 
 if ! kind get clusters | grep -qx "$NAME"; then
   cat <<KIND | kind create cluster --name "$NAME" --config -
@@ -26,6 +26,11 @@ k apply -n argocd --server-side --force-conflicts -f "https://raw.githubusercont
 k create namespace argo-rollouts --dry-run=client -o yaml | k apply -f -
 k apply -n argo-rollouts --server-side --force-conflicts -f "https://github.com/argoproj/argo-rollouts/releases/download/${ROLLOUTS}/install.yaml"
 k apply --server-side -f "https://github.com/kubernetes-sigs/gateway-api/releases/download/${GATEWAY}/standard-install.yaml"
+# Like the Radar cluster: resource metrics for kubectl top and the HPA (kind needs insecure kubelet TLS).
+k apply -f "https://github.com/kubernetes-sigs/metrics-server/releases/download/${METRICS}/components.yaml"
+if ! k -n kube-system get deployment metrics-server -o jsonpath='{.spec.template.spec.containers[0].args}' | grep -q kubelet-insecure-tls; then
+  k -n kube-system patch deployment metrics-server --type json -p '[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--kubelet-insecure-tls"}]'
+fi
 # Like the Radar cluster: Argo CD watches Applications in team-* namespaces, project team-<team>.
 k -n argocd patch configmap argocd-cmd-params-cm --type merge -p '{"data":{"application.namespaces":"team-*"}}'
 # Like the Radar cluster: the inert HTTPRoute (no Gateway here) counts as healthy.

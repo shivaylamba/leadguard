@@ -11,6 +11,7 @@ resources:
   - service.yaml
   - httproute.yaml
   - ingest.yaml
+  - hpa.yaml
   - integrity.yaml
   - analysis-template.yaml
   - ops.yaml
