@@ -9,7 +9,7 @@ h1 { margin: 0; font-size: 1.6em; } h1 a { color: var(--fg); text-decoration: no
 nav { display:flex; gap:16px; flex-wrap:wrap; } nav a, a { color: var(--acc); }
 a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid var(--acc); outline-offset: 2px; }
 form.search { display:flex; gap:8px; flex-wrap:wrap; margin: 8px 0 16px; }
-input[type=search] { flex:1 1 280px; padding:12px; font-size:1em; border-radius:10px; border:2px solid var(--line); background:var(--panel); color:var(--fg); }
+input[type=search], input[type=email], input:not([type]) { flex:1 1 280px; padding:12px; font-size:1em; border-radius:10px; border:2px solid var(--line); background:var(--panel); color:var(--fg); }
 button, select { padding:10px 14px; font-size:1em; border-radius:10px; border:2px solid var(--line); background:var(--panel); color:var(--fg); cursor:pointer; }
 button.primary { background: var(--acc); color: #04201c; border-color: var(--acc); font-weight: 700; }
 .card { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:14px 16px; margin: 10px 0; }

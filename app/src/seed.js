@@ -67,7 +67,7 @@ const STREAMS = {
 // Expo hall around the Salt Palace, booths ~40 m apart. Demo booths for the hackathon's sponsors.
 const BOOTHS = [
   ['dash0', 'Dash0', 0, 0], ['sonar', 'Sonar', 0, 1], ['elastic', 'Elastic', 0, 2],
-  ['radar', 'Radar', 1, 0], ['community', 'Community hub', 1, 1], ['demo', 'Demo booth', 1, 2],
+  ['radar', 'Radar', 1, 0], ['community', 'Community', 1, 1], ['demo', 'Demo', 1, 2],
 ].map(([booth_id, sponsor, row, col]) => ({ booth_id, sponsor, name: `${sponsor} booth`, location: { lat: 40.7631 + row * 0.00036, lon: -111.8962 + col * 0.00047 }, demo: true }));
 
 function synthetic(n = 400, now = Date.now()) {
