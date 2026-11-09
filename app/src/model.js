@@ -33,14 +33,16 @@ function isExpoOpen(date, hours = process.env.EXPO_HOURS || '', tz = VENUE_TZ) {
 
 // A scanner's clock can be wrong. Trust its time only within the allowed skew of
 // when the server received the scan; otherwise use the receive time and say so.
-const MAX_SKEW_MS = 10 * 60 * 1000;
+// 'queued' = made on the device more than a minute before the server got it: the scanner was
+// offline and synced later. Those scans are evidence that leads were *not* lost.
+const LATE_MS = 60 * 1000;
 function scanTime(deviceIso, receivedAt) {
   const device = Date.parse(deviceIso);
   if (Number.isNaN(device)) return { at: receivedAt.toISOString(), clock: 'missing' };
   const skew = device - receivedAt.getTime();
   if (skew > 60 * 1000) return { at: receivedAt.toISOString(), clock: 'future', skew_ms: skew }; // can't scan in the future
   if (-skew > 24 * 3600 * 1000) return { at: receivedAt.toISOString(), clock: 'stale', skew_ms: skew }; // a day-old queue is suspect
-  return { at: new Date(device).toISOString(), clock: Math.abs(skew) > MAX_SKEW_MS ? 'queued' : 'ok', skew_ms: skew };
+  return { at: new Date(device).toISOString(), clock: -skew > LATE_MS ? 'queued' : 'ok', skew_ms: skew };
 }
 
 // ── input validation ───────────────────────────────────────────────────────

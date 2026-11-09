@@ -19,6 +19,8 @@ test('scanner clocks: future times and day-old times fall back to receipt time',
   const rx = new Date('2026-11-09T18:00:00Z');
   assert.equal(m.scanTime('2026-11-09T17:59:30Z', rx).clock, 'ok');
   assert.equal(m.scanTime('2026-11-09T17:30:00Z', rx).clock, 'queued'); // offline queue, synced later
+  assert.equal(m.scanTime('2026-11-09T17:57:00Z', rx).clock, 'queued'); // a 3-minute outage counts too
+  assert.equal(m.scanTime('2026-11-09T17:59:20Z', rx).clock, 'ok');     // ordinary sync delay
   assert.deepEqual(m.scanTime('2026-11-09T19:00:00Z', rx).at, rx.toISOString());
   assert.equal(m.scanTime('2026-11-09T19:00:00Z', rx).clock, 'future');
   assert.equal(m.scanTime('2026-11-07T18:00:00Z', rx).clock, 'stale');
