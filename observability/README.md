@@ -18,3 +18,15 @@ works but there's no matching traffic right now (for example no 5xx, which is go
 
 Verify on site with the Dash0 trial: the metric naming (`http_server_request_duration_seconds_*`, `service_name`) follows
 Dash0's own examples; check one query in Dash0's explorer before `apply`.
+
+## Applied (Dash0 org in us-west-2, dataset `default`)
+
+`dash0 apply -f observability/dash0/<file> --dataset default` (CLI v1.20.0, token from a file outside the repo):
+
+- the dashboard "LeadGuard: conference health";
+- 6 check rules;
+- 2 SLOs. Dash0 accepts 28-day (not 1-day or 7-day) SLO windows.
+
+The synthetic checks wait for the public team URL. Verified in Dash0: `leadguard_scans_total`,
+`http_server_request_duration_seconds_count{service_name="leadguard-ingest"}`, `{otel_metric_name="leadguard.scans"}`
+and the sync-lag histogram all return live data.
