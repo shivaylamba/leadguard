@@ -26,7 +26,7 @@ spec:
             limits: { cpu: "3", memory: 5Gi }
           volumeMounts: [{ name: data, mountPath: /usr/share/elasticsearch/data }]
           readinessProbe:
-            httpGet: { path: /_cluster/health?local=true, port: http }
+            httpGet: { path: "/_cluster/health?local=true", port: http }
             periodSeconds: 10
   volumeClaimTemplates:
     - metadata: { name: data }
