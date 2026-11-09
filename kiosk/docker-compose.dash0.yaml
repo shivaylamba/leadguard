@@ -1,0 +1,10 @@
+# Overlay: also send the kiosk's eBPF telemetry to Dash0.
+#   set -a; . ~/.config/leadguard/dash0.env; set +a; make up-dash0
+services:
+  otelcol:
+    volumes: ["./collector/config.dash0.yaml:/etc/otelcol/config.yaml:ro"]
+    environment:
+      DASH0_OTLP_GRPC: ${DASH0_OTLP_GRPC:-ingress.us-west-2.aws.dash0.com:4317}
+      DASH0_AUTH_TOKEN: ${DASH0_AUTH_TOKEN:?set DASH0_AUTH_TOKEN (source ~/.config/leadguard/dash0.env)}
+      DASH0_DATASET: ${DASH0_DATASET:-default}
+      KIOSK_ID: ${KIOSK_ID:-kiosk-1}

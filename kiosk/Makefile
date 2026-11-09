@@ -1,10 +1,13 @@
 # LeadGuard check-in kiosk under eBPF. Everything runs in Docker Desktop's Linux VM (kernel with BTF => eBPF works).
 COMPOSE = docker compose -f docker-compose.yaml
 
-.PHONY: up down reset incident calm learn detect report check ps logs obi-logs prof-logs ports who
+.PHONY: up up-dash0 down reset incident calm learn detect report check ps logs obi-logs prof-logs ports who
 
 up:                ## backends + kiosk + badge taps + OBI + profiler
 	$(COMPOSE) up -d
+
+up-dash0:          ## same, plus a copy of OBI's flows/RED/traces to Dash0 (needs DASH0_AUTH_TOKEN in the env)
+	$(COMPOSE) -f docker-compose.dash0.yaml up -d
 
 down:
 	$(COMPOSE) --profile incident down -v --remove-orphans

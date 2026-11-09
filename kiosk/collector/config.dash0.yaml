@@ -1,0 +1,34 @@
+# Same as config.yaml, plus a copy of everything to Dash0 (make up-dash0). OBI's flows and RED
+# metrics and its traces land next to LeadGuard's own telemetry, tagged service.namespace=leadguard-kiosk.
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+processors:
+  batch: {}
+  resource/kiosk:
+    attributes:
+      - { key: service.namespace, value: leadguard-kiosk, action: upsert }
+      - { key: deployment.environment.name, value: cnh, action: upsert }
+      - { key: leadguard.kiosk.id, value: "${env:KIOSK_ID}", action: upsert }
+exporters:
+  otlp_http/prometheus:
+    endpoint: http://prometheus:9090/api/v1/otlp
+  otlp_grpc/dash0:
+    endpoint: ${env:DASH0_OTLP_GRPC}
+    headers:
+      Authorization: Bearer ${env:DASH0_AUTH_TOKEN}
+      Dash0-Dataset: ${env:DASH0_DATASET}
+service:
+  pipelines:
+    metrics:
+      receivers: [otlp]
+      processors: [resource/kiosk, batch]
+      exporters: [otlp_http/prometheus, otlp_grpc/dash0]
+    traces:
+      receivers: [otlp]
+      processors: [resource/kiosk, batch]
+      exporters: [otlp_grpc/dash0]

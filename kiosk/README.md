@@ -38,4 +38,8 @@ reported too.
 | http://localhost:4040 | Pyroscope (profiles per `<exe>:<pid>`) |
 | http://localhost:18088/tap | the kiosk (one badge tap) |
 
+**Send it to Dash0 too:** `set -a; . ~/.config/leadguard/dash0.env; set +a; make up-dash0`. OBI's flows, RED metrics and
+traces then also go to Dash0 under `service.namespace=leadguard-kiosk` (verified: per-port flow rates in Dash0). Profiles
+stay in the local Pyroscope.
+
 The kiosk reaches LeadGuard at `LEADGUARD_URL` (default `http://host.docker.internal:18080`, the SSH tunnel to Civo).
