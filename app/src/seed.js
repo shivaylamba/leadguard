@@ -37,7 +37,7 @@ const INDICES = {
         name: { type: 'text', fields: { raw: { type: 'keyword' } } }, email: { type: 'keyword' }, company: { type: 'text', fields: { raw: { type: 'keyword' } } },
         notes: { type: 'text', ...(SEMANTIC ? { copy_to: 'notes_semantic' } : {}) },
         ...(SEMANTIC ? { notes_semantic: { type: 'semantic_text', inference_id: SEMANTIC } } : {}),
-        first_seen: { type: 'date' }, last_seen: { type: 'date' }, scan_count: { type: 'integer' },
+        first_seen: { type: 'date' }, last_seen: { type: 'date' }, scan_count: { type: 'integer' }, scan_ids: { type: 'keyword', index: false },
       },
     },
   },

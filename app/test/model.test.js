@@ -99,3 +99,32 @@ test('pseudonyms are stable and never the raw id', () => {
   assert.notEqual(pseudonym('B10001'), 'B10001');
   assert.equal(pseudonym(undefined), 'anonymous');
 });
+
+test('lead merge: counts scans, keeps the earliest and latest, copies contact only with consent', () => {
+  const person = { name: 'Zoë Müller', emails: ['zoe@acme.example'], company: 'Acme Cloud' };
+  const a = m.mergeLead(null, [{ at: '2026-11-09T18:05:00Z', consent: false }, { at: '2026-11-09T18:00:00Z', consent: false, notes: 'pricing' }], person, 'dash0', 'B1');
+  assert.equal(a.scan_count, 2);
+  assert.equal(a.first_seen, '2026-11-09T18:00:00Z');
+  assert.equal(a.last_seen, '2026-11-09T18:05:00Z');
+  assert.equal(a.consent, false);
+  assert.equal(a.email, undefined);
+  const b = m.mergeLead(a, [{ at: '2026-11-09T18:10:00Z', consent: true }], person, 'dash0', 'B1');
+  assert.equal(b.scan_count, 3);
+  assert.equal(b.consent, true);
+  assert.equal(b.email, 'zoe@acme.example');
+  assert.equal(b.notes, 'pricing');
+  assert.equal(m.mergeLead(b, [{ at: '2026-11-09T18:11:00Z', consent: false }], person, 'dash0', 'B1').consent, true); // not silently revoked
+});
+
+test('scans a few seconds before check-in are not flagged (clock tolerance)', () => {
+  assert.match(m.integrityEsql(60), new RegExp(`first_checkin_at - ${m.CLOCK_TOLERANCE_MIN} minutes`));
+});
+
+test('lead merge is idempotent by scan_id (retried batch after a failed lead write)', () => {
+  const scans = [{ scan_id: 's1', at: '2026-11-09T18:00:00Z', consent: true }, { scan_id: 's2', at: '2026-11-09T18:01:00Z', consent: true }];
+  const once = m.mergeLead(null, scans, null, 'dash0', 'B1');
+  const again = m.mergeLead(once, scans, null, 'dash0', 'B1');
+  assert.equal(once.scan_count, 2);
+  assert.equal(again.scan_count, 2);
+  assert.equal(m.mergeLead(again, [{ scan_id: 's3', at: '2026-11-09T18:02:00Z', consent: true }], null, 'dash0', 'B1').scan_count, 3);
+});

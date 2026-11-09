@@ -51,7 +51,8 @@ async function checkin(req, res) {
   const at = now().toISOString();
   await es().index({ index: INDEX.checkins, op_type: 'create', document: { '@timestamp': at, badge_id: badge, desk_id: desk } });
   // First check-in wins; later ones are re-entries.
-  const first = await es().index({ index: INDEX.checkedIn, id: badge, op_type: 'create', document: { badge_id: badge, first_checkin_at: at } }, { ignore: [409] });
+  // refresh: the integrity sweep must see this check-in before it judges this badge's scans.
+  const first = await es().index({ index: INDEX.checkedIn, id: badge, op_type: 'create', refresh: 'wait_for', document: { badge_id: badge, first_checkin_at: at } }, { ignore: [409] });
   const reentry = first.result !== 'created';
   t.checkins.add(1, { 'leadguard.desk.id': desk, 'leadguard.checkin.reentry': reentry });
   res.status(201).json({ ok: true, badge_id: badge, name: att._source.name, reentry });
@@ -81,8 +82,13 @@ async function scanBatch(req, res) {
       const s = valid[i];
       if (it.create.status === 201) accepted.push(s);
       else if (it.create.status === 409) duplicate.push(s.scan_id); // retried batch: already stored
+      else console.error(JSON.stringify({ level: 'error', msg: 'scan not stored', status: it.create.status, error: it.create.error?.type }));
+      // Anything not in `stored` stays on the device and is retried.
     });
-    if (accepted.length) await upsertLeads(booth, accepted);
+    // Duplicates go through too: the merge is idempotent by scan_id, so a batch retried after
+    // a failed lead write repairs the lead instead of losing it.
+    const forLeads = [...accepted, ...valid.filter((v) => duplicate.includes(v.scan_id))];
+    if (forLeads.length) await upsertLeads(booth, forLeads);
   }
   t.scans.add(accepted.length, { 'leadguard.booth.id': booth, outcome: 'accepted' });
   if (duplicate.length) t.scans.add(duplicate.length, { 'leadguard.booth.id': booth, outcome: 'duplicate' });
@@ -91,28 +97,40 @@ async function scanBatch(req, res) {
   res.json({ stored: [...accepted.map((s) => s.scan_id), ...duplicate], rejected });
 }
 
-// One lead per booth+badge. Contact details are copied only with consent.
-async function upsertLeads(booth, scans) {
-  const badges = [...new Set(scans.map((s) => s.badge_id.toUpperCase()))];
-  const people = await es().mget({ index: INDEX.attendees, ids: badges });
-  const byBadge = Object.fromEntries(people.docs.filter((d) => d.found).map((d) => [d._id, d._source]));
-  const ops = [];
+// One lead per booth+badge. Read, merge (model.mergeLead), write with optimistic concurrency:
+// two ingest pods updating the same lead can't overwrite each other; a conflict is retried.
+async function upsertLeads(booth, scans, attempt = 1) {
+  const groups = new Map();
   for (const s of scans) {
     const badge = s.badge_id.toUpperCase();
-    const p = byBadge[badge];
-    const contact = s.consent && p ? { name: p.name, email: p.emails?.[0], company: p.company } : {};
-    const at = m.scanTime(s.scanned_at, now()).at;
-    ops.push({ update: { _index: INDEX.leads, _id: m.leadId(booth, badge), retry_on_conflict: 3 } }, {
-      script: {
-        source: `ctx._source.scan_count += 1; ctx._source.last_seen = params.at;
-                 if (params.consent) { ctx._source.consent = true; ctx._source.putAll(params.contact); }
-                 if (params.notes != null && params.notes != '') { ctx._source.notes = params.notes; }`,
-        params: { at, consent: s.consent, contact, notes: s.notes ?? null },
-      },
-      upsert: { booth_id: booth, badge_id: badge, known_attendee: Boolean(p), first_seen: at, last_seen: at, scan_count: 1, consent: s.consent, notes: s.notes || '', ...contact },
-    });
+    (groups.get(badge) || groups.set(badge, []).get(badge)).push({ scan_id: s.scan_id, at: m.scanTime(s.scanned_at, now()).at, consent: s.consent, notes: s.notes });
   }
-  await t.inSpan('upsert leads', { 'leadguard.booth.id': booth, 'leadguard.leads.count': badges.length }, () => es().bulk({ operations: ops }));
+  const badges = [...groups.keys()];
+  const [people, leads] = await Promise.all([
+    es().mget({ index: INDEX.attendees, ids: badges }),
+    es().mget({ index: INDEX.leads, ids: badges.map((b) => m.leadId(booth, b)), _source_excludes: ['notes_semantic'] }),
+  ]);
+  const ops = [];
+  badges.forEach((badge, i) => {
+    const person = people.docs[i].found ? people.docs[i]._source : null;
+    const cur = leads.docs[i];
+    const doc = m.mergeLead(cur.found ? cur._source : null, groups.get(badge), person, booth, badge);
+    ops.push(cur.found
+      ? { index: { _index: INDEX.leads, _id: cur._id, if_seq_no: cur._seq_no, if_primary_term: cur._primary_term } }
+      : { create: { _index: INDEX.leads, _id: m.leadId(booth, badge) } }, doc);
+  });
+  const r = await t.inSpan('upsert leads', { 'leadguard.booth.id': booth, 'leadguard.leads.count': badges.length }, () => es().bulk({ operations: ops }));
+  const conflicted = [], failed = [];
+  r.items.forEach((it, i) => {
+    const res = it.index || it.create;
+    if (res.status === 409) conflicted.push(badges[i]);
+    else if (res.error) failed.push(`${badges[i]}: ${res.error.type}`);
+  });
+  if (failed.length) throw new Error(`lead upsert failed for ${failed.length}: ${failed[0]}`);
+  if (conflicted.length) {
+    if (attempt >= 3) throw new Error(`lead upsert: ${conflicted.length} conflicts after 3 attempts`);
+    await upsertLeads(booth, scans.filter((s) => conflicted.includes(s.badge_id.toUpperCase())), attempt + 1);
+  }
 }
 
 async function heartbeat(req, res) {
@@ -238,7 +256,7 @@ if (ROLE === 'web') {
     const filter = [{ term: { booth_id: booth } }, { term: { consent: true } }];
     const query = q ? { bool: { filter, must: SEMANTIC ? { semantic: { field: 'notes_semantic', query: q } } : { match: { notes: q } } } } : { bool: { filter } };
     t.annotate({ 'leadguard.booth.id': booth, 'leadguard.search.mode': q ? (SEMANTIC ? 'semantic' : 'keyword') : 'list' });
-    const r = await es().search({ index: INDEX.leads, size: 200, query, sort: q ? undefined : [{ last_seen: 'desc' }], _source: { excludes: ['notes_semantic'] } });
+    const r = await es().search({ index: INDEX.leads, size: 200, query, sort: q ? undefined : [{ last_seen: 'desc' }], _source: { excludes: ['notes_semantic', 'scan_ids'] } });
     res.json({ leads: r.hits.hits.map((h) => h._source) });
   }));
 

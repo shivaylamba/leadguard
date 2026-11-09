@@ -7,8 +7,9 @@ const t = require('./telemetry');
 
 const INTERVAL_S = Number(process.env.INTEGRITY_INTERVAL_S || 30);
 const WINDOW_MIN = Number(process.env.INTEGRITY_WINDOW_MIN || 240);
-// Booth and scanner problems clear themselves when fixed; lead problems wait for an organizer.
-const SELF_CLEARING = ['silent_booth', 'scanner_offline', 'scans_not_syncing'];
+// Re-evaluated every sweep: they clear when the condition does (the badge checks in late,
+// the booth scans again, the scanner syncs). impossible_travel is historical and stays open.
+const SELF_CLEARING = ['never_checked_in', 'scanned_before_checkin', 'silent_booth', 'scanner_offline', 'scans_not_syncing'];
 
 async function leadAnomalies() {
   const r = await es().esql.query({ query: m.integrityEsql(WINDOW_MIN) });
@@ -57,6 +58,7 @@ async function tick() {
     let created = 0;
     if (ops.length) {
       const r = await es().bulk({ operations: ops, refresh: 'wait_for' });
+      if (r.errors) throw new Error(`anomaly upsert: ${JSON.stringify(r.items.find((x) => x.update?.error).update.error).slice(0, 200)}`);
       r.items.forEach((it, i) => { if (it.update.result === 'created') { created++; t.anomalies.add(1, { 'leadguard.anomaly.kind': found[i].kind }); } });
     }
     // Clear booth/scanner anomalies that are no longer detected.

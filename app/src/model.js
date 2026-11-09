@@ -50,6 +50,30 @@ function validScan(s) {
 }
 
 const leadId = (boothId, badgeId) => `${boothId}:${badgeId}`;
+
+// Fold a batch's scans for one booth+badge into the lead record. Pure, so the ingest path can
+// read-merge-write (semantic_text indices don't allow scripted updates) and tests can pin it.
+// Contact details are copied only with consent; once consent is given it isn't silently revoked.
+// Idempotent by scan_id: a retried batch (scans already stored, lead write failed) repairs the
+// lead without double-counting.
+function mergeLead(existing, scans, person, booth, badge) {
+  const sorted = [...scans].sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
+  const lead = existing ? { ...existing, scan_ids: [...(existing.scan_ids || [])] } : {
+    booth_id: booth, badge_id: badge, known_attendee: Boolean(person), first_seen: sorted[0].at, last_seen: sorted[0].at, scan_count: 0, consent: false, notes: '', scan_ids: [],
+  };
+  for (const s of sorted) {
+    if (s.scan_id && lead.scan_ids.includes(s.scan_id)) continue;
+    if (s.scan_id) lead.scan_ids.push(s.scan_id);
+    lead.scan_count += 1;
+    if (Date.parse(s.at) > Date.parse(lead.last_seen)) lead.last_seen = s.at;
+    if (Date.parse(s.at) < Date.parse(lead.first_seen)) lead.first_seen = s.at;
+    if (s.consent) lead.consent = true;
+    if (s.notes) lead.notes = s.notes;
+  }
+  if (lead.scan_ids.length > 200) lead.scan_ids = lead.scan_ids.slice(-200);
+  if (lead.consent && person) Object.assign(lead, { name: person.name, email: person.emails?.[0], company: person.company });
+  return lead;
+}
 const normEmail = (e) => String(e || '').trim().toLowerCase();
 
 // ── desk lookup: find a person who can't find their ticket ───────────────
@@ -86,11 +110,13 @@ function ticketEmailRisk(latest, now, quietHours = 24) {
 // ── detectors ──────────────────────────────────────────────────────────────
 // ES|QL: scans whose badge never checked in, or was scanned before it checked in.
 // checked_in is a lookup-mode index (badge_id → first_checkin_at) kept by the check-in path.
+// Devices and desks disagree by seconds; only a scan clearly before check-in is suspicious.
+const CLOCK_TOLERANCE_MIN = 2;
 function integrityEsql(windowMin) {
   return `FROM scans
 | WHERE @timestamp > NOW() - ${Number(windowMin)} minutes
 | LOOKUP JOIN checked_in ON badge_id
-| EVAL kind = CASE(first_checkin_at IS NULL, "never_checked_in", scanned_at < first_checkin_at, "scanned_before_checkin", "ok")
+| EVAL kind = CASE(first_checkin_at IS NULL, "never_checked_in", scanned_at < first_checkin_at - ${CLOCK_TOLERANCE_MIN} minutes, "scanned_before_checkin", "ok")
 | WHERE kind != "ok"
 | STATS scans = COUNT(*), first_scan = MIN(scanned_at), last_scan = MAX(scanned_at) BY kind, badge_id, booth_id
 | LIMIT 1000`;
@@ -162,6 +188,6 @@ const EXPLAIN = {
 };
 
 module.exports = {
-  isId, isExpoOpen, localMinutes, scanTime, validScan, leadId, normEmail, attendeeSearch, ticketEmailRisk, EMAIL_STATES,
+  isId, isExpoOpen, localMinutes, scanTime, validScan, leadId, mergeLead, normEmail, CLOCK_TOLERANCE_MIN, attendeeSearch, ticketEmailRisk, EMAIL_STATES,
   integrityEsql, metres, impossibleTravel, boothHealth, anomalyId, EXPLAIN, VENUE_TZ, MAX_WALK_MPS,
 };
