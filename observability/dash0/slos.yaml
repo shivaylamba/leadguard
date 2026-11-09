@@ -1,0 +1,71 @@
+# Dash0 SLOs (Dash0's OpenSLO v1 dialect). Queries are bare selectors; Dash0 does the counter math.
+# The good query is a strict subset of the total query.
+apiVersion: openslo.com/v1
+kind: SLO
+metadata:
+  name: leadguard-scans-stored
+  labels:
+    dash0.com/origin: leadguard-scans-stored
+  annotations:
+    dash0.com/display-name: "LeadGuard: scans stored"
+spec:
+  description: 99.9% of lead scans sent by booth scanners are stored (accepted, or recognised as an already-stored retry). Rejected scans are malformed and never reach a sponsor.
+  service: leadguard-ingest
+  budgetingMethod: Occurrences
+  timeWindow:
+    - duration: 1d
+      isRolling: true
+  indicator:
+    metadata:
+      name: leadguard-scans-stored-ratio
+    spec:
+      ratioMetric:
+        counter: true
+        good:
+          metricSource:
+            type: Prometheus
+            spec:
+              query: '{otel_metric_name="leadguard.scans",service_name="leadguard-ingest",outcome=~"accepted|duplicate"}'
+        total:
+          metricSource:
+            type: Prometheus
+            spec:
+              query: '{otel_metric_name="leadguard.scans",service_name="leadguard-ingest"}'
+  objectives:
+    - displayName: 99.9% of scans stored
+      target: 0.999
+---
+apiVersion: openslo.com/v1
+kind: SLO
+metadata:
+  name: leadguard-ingest-availability
+  labels:
+    dash0.com/origin: leadguard-ingest-availability
+  annotations:
+    dash0.com/display-name: "LeadGuard: check-in and scan writes succeed"
+spec:
+  description: 99.5% of writes to the ingest service (check-ins, scan batches, heartbeats) succeed during the event.
+  service: leadguard-ingest
+  budgetingMethod: Occurrences
+  timeWindow:
+    - duration: 1d
+      isRolling: true
+  indicator:
+    metadata:
+      name: leadguard-ingest-non-5xx
+    spec:
+      ratioMetric:
+        counter: true
+        good:
+          metricSource:
+            type: Prometheus
+            spec:
+              query: '{otel_metric_name="http.server.request.duration",service_name="leadguard-ingest",http_response_status_code!~"5.."}'
+        total:
+          metricSource:
+            type: Prometheus
+            spec:
+              query: '{otel_metric_name="http.server.request.duration",service_name="leadguard-ingest"}'
+  objectives:
+    - displayName: 99.5% of writes succeed
+      target: 0.995

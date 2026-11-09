@@ -1,0 +1,66 @@
+# Dash0 check rules (PrometheusRule format). Apply: dash0 apply -f observability/dash0/
+# Metric names follow Dash0's Prometheus view of OTel metrics (unit suffix, _total, service_name).
+# observability/check.sh runs every expression against the local Prometheus first.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: leadguard
+  labels:
+    dash0.com/id: leadguard-check-rules
+  annotations:
+    team: leadguard
+spec:
+  groups:
+    - name: leadguard
+      interval: 1m
+      rules:
+        - alert: BoothWentSilent
+          expr: sum by (leadguard_booth_id) (increase(leadguard_anomalies_total{leadguard_anomaly_kind=~"silent_booth|scanner_offline|scans_not_syncing"}[5m])) > $__threshold
+          for: 0s
+          annotations:
+            summary: "Booth {{ $labels.leadguard_booth_id }} stopped sending leads"
+            description: "A booth that was scanning has gone quiet, a scanner stopped reporting, or scans are stuck on a device. Leads are probably being lost right now: send someone to the booth before the sponsor notices."
+            dash0-threshold-degraded: "0"
+            dash0-threshold-critical: "1"
+        - alert: ScanSyncLagHigh
+          expr: histogram_quantile(0.95, sum by (le) (rate(leadguard_scan_sync_lag_seconds_bucket[10m]))) > $__threshold
+          for: 5m
+          annotations:
+            summary: "Scans take too long to reach the server (p95)"
+            description: "SLO: scan to synced lead p95 under 30 s. High lag means scanners are offline or ingest is struggling (for example after a Wi-Fi outage, when every scanner flushes its queue at once)."
+            dash0-threshold-degraded: "30"
+            dash0-threshold-critical: "120"
+        - alert: IngestErrors
+          expr: |
+            sum(rate(http_server_request_duration_seconds_count{service_name="leadguard-ingest", http_response_status_code=~"5.."}[5m]))
+              / sum(rate(http_server_request_duration_seconds_count{service_name="leadguard-ingest"}[5m])) > $__threshold
+          for: 2m
+          annotations:
+            summary: "Check-in and scan writes are failing"
+            description: "5xx on the ingest service, which carries every write that must not be lost (check-ins, scan batches, heartbeats)."
+            dash0-threshold-degraded: "0.01"
+            dash0-threshold-critical: "0.05"
+        - alert: CheckinSlow
+          expr: histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_seconds_bucket{service_name="leadguard-ingest", http_route="/api/checkin"}[5m]))) > $__threshold
+          for: 3m
+          annotations:
+            summary: "Check-in is slow at the desk (p95)"
+            description: "SLO: check-in p95 under 2 s. At doors-open (139 badges in one hour at ZurichJS) a slow desk becomes a queue."
+            dash0-threshold-degraded: "1"
+            dash0-threshold-critical: "2"
+        - alert: LeadIntegrityAnomalies
+          expr: sum(increase(leadguard_anomalies_total{leadguard_anomaly_kind=~"never_checked_in|impossible_travel|scanned_before_checkin"}[15m])) > $__threshold
+          for: 0s
+          annotations:
+            summary: "Leads that don't match check-ins"
+            description: "Scans for badges that never checked in, shared badges at two booths, or scans before check-in. Review in LeadGuard's organizer view before exporting leads to sponsors."
+            dash0-threshold-degraded: "3"
+            dash0-threshold-critical: "10"
+        - alert: DeskCantFindPeople
+          expr: sum(increase(leadguard_desk_not_found_total[10m])) > $__threshold
+          for: 0s
+          annotations:
+            summary: "Desk searches are finding nobody"
+            description: "People can't find their ticket (job change, wrong email). Check 'Tickets at risk' and the email provider for bounces."
+            dash0-threshold-degraded: "5"
+            dash0-threshold-critical: "15"

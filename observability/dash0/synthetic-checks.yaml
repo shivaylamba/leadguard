@@ -1,0 +1,21 @@
+# Dash0 synthetic checks: the public app, the desk lookup path, and the scanner sync path.
+# Replace <team> with the Radar team name (scripts/setup.sh does the same for deploy/).
+apiVersion: dash0.com/v1alpha1
+kind: SyntheticCheck
+metadata:
+  name: LeadGuard readiness
+  labels:
+    dash0.com/id: leadguard-readiness
+spec:
+  url: https://<team>.cnh.radarhq.io/readyz
+  interval: 60s
+---
+apiVersion: dash0.com/v1alpha1
+kind: SyntheticCheck
+metadata:
+  name: LeadGuard booth health API
+  labels:
+    dash0.com/id: leadguard-booth-health
+spec:
+  url: https://<team>.cnh.radarhq.io/api/booths/health
+  interval: 60s
