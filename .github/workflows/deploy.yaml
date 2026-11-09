@@ -8,6 +8,12 @@ on:
     paths-ignore:
       - deploy/kustomization.yaml
       - "**.md"
+      # No new image (and no new canary) for changes that aren't in the image.
+      - local/**
+      - docs/**
+      - .gitar/**
+      - api/**
+      - kiosk/**
   workflow_dispatch:
 
 permissions:

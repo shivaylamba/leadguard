@@ -122,6 +122,14 @@ async function main() {
     if (exists && reset) await es().indices.delete({ index: name });
     if (!exists || reset) await es().indices.create({ index: name, ...body });
   }
+  // If leads was created before semantic search was configured (or by an early write), add the
+  // semantic field in place instead of dropping the sponsors' leads.
+  if (SEMANTIC) {
+    const map = await es().indices.getMapping({ index: INDEX.leads });
+    if (!map[INDEX.leads]?.mappings?.properties?.notes_semantic) {
+      await es().indices.putMapping({ index: INDEX.leads, properties: { notes_semantic: { type: 'semantic_text', inference_id: SEMANTIC }, notes: { type: 'text', copy_to: 'notes_semantic' } } });
+    }
+  }
   for (const [name, properties] of Object.entries(STREAMS)) {
     await es().indices.putIndexTemplate({ name, index_patterns: [name], data_stream: {}, priority: 500, template: { mappings: { properties } } });
     if (reset) await es().indices.deleteDataStream({ name }, { ignore: [404] });
