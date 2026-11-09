@@ -119,7 +119,7 @@ function mount(app, wrap) {
       await server.connect(transport);
       await transport.handleRequest(req, res, req.body);
     } catch (err) {
-      console.error(JSON.stringify({ level: 'error', msg: `mcp: ${err.message}` }));
+      t.log('error', `mcp: ${err.message}`, { 'error.type': err.name || 'Error' });
       if (!res.headersSent) res.status(500).json({ error: 'mcp error' });
     }
   });
@@ -133,8 +133,9 @@ function mount(app, wrap) {
       method: 'POST', headers: { 'content-type': 'application/json' }, signal: AbortSignal.timeout(180000),
       body: JSON.stringify({ model: 'leadguard-ops', stream: false, messages: [{ role: 'user', content: question }] }),
     }));
-    if (!r.ok) return res.status(502).json({ error: `assistant unavailable (${r.status})` });
+    if (!r.ok) { t.log('error', 'assistant unavailable', { 'http.response.status_code': r.status }); return res.status(502).json({ error: `assistant unavailable (${r.status})` }); }
     const out = await r.json();
+    t.log('info', 'assistant answered', { 'leadguard.ops.answer_chars': (out.choices?.[0]?.message?.content ?? '').length });
     res.json({ answer: out.choices?.[0]?.message?.content ?? '' });
   }));
 

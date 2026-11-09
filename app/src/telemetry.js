@@ -4,7 +4,7 @@
 // metrics) and pseudonymises badge ids: no badge id, name or email ever reaches a span,
 // a metric or a log (Gitar rule: .gitar/review/leads-privacy.md).
 const crypto = require('node:crypto');
-const { trace, metrics, SpanStatusCode } = require('@opentelemetry/api');
+const { trace, metrics, logs, context, SpanStatusCode } = require('@opentelemetry/api');
 
 const tracer = trace.getTracer('leadguard');
 const meter = metrics.getMeter('leadguard');
@@ -35,9 +35,18 @@ async function inSpan(name, attributes, fn) {
   });
 }
 
+// Structured logs: one JSON line on stdout (kubectl logs) and an OTel log record (Dash0), linked to
+// the active trace. Attributes follow the same privacy rule as spans: no names, emails or raw badges.
+const otelLogger = logs.getLogger('leadguard');
+const SEVERITY = { debug: 5, info: 9, warn: 13, error: 17 };
+function log(level, msg, attrs = {}) {
+  console.log(JSON.stringify({ level, msg, ...attrs }));
+  otelLogger.emit({ severityNumber: SEVERITY[level] ?? 9, severityText: level.toUpperCase(), body: msg, attributes: attrs, context: context.active() });
+}
+
 function annotate(attrs) {
   const span = trace.getActiveSpan();
   if (span) span.setAttributes(attrs);
 }
 
-module.exports = { tracer, meter, checkins, scans, syncLag, anomalies, queueDepth, pseudonym, inSpan, annotate };
+module.exports = { tracer, meter, checkins, scans, syncLag, anomalies, queueDepth, pseudonym, inSpan, annotate, log };

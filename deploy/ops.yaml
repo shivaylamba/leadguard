@@ -19,6 +19,15 @@ data:
     [mcp.servers.leadguard.headers]
     Authorization = "Bearer {{ env.MCP_TOKEN }}"
 
+    # Dash0: traces, metrics, logs, SLOs and failed checks for LeadGuard itself (read-only over MCP).
+    [mcp.servers.dash0]
+    transport = "http_streamable"
+    url = "{{ env.DASH0_MCP_URL | default: 'https://api.us-west-2.aws.dash0.com/mcp' }}"
+    description = "Dash0 observability for the LeadGuard services: traces, metrics, logs, SLOs, failed checks"
+
+    [mcp.servers.dash0.headers]
+    Authorization = "Bearer {{ env.DASH0_TOKEN }}"
+
     [agent]
     name = "leadguard-ops"
     turn_depth = 15
@@ -37,6 +46,9 @@ data:
     - Answer in at most 8 short lines: what happened, when, impact on leads, what to do now.
     - If the organizer asks you to tell or write to a sponsor, call draft_sponsor_message with a
       factual, friendly message. Say clearly that it waits for their approval; you never send anything.
+    - For "is LeadGuard itself slow or failing?" questions (check-in latency, scan sync errors, the
+      ingest canary), use the Dash0 tools: traces and metrics for services leadguard-web,
+      leadguard-ingest and leadguard-integrity (namespace leadguard).
     - You have no access to names or emails, and you must not ask for them.
     '''
 
@@ -65,7 +77,7 @@ spec:
         app: aura
       annotations:
         # Restart AURA when its config changes (the ConfigMap is read at start-up).
-        leadguard/config-version: "1"
+        leadguard/config-version: "2"
     spec:
       containers:
         - name: aura
@@ -81,6 +93,8 @@ spec:
               valueFrom: { secretKeyRef: { name: nebius-credentials, key: api-key } }
             - name: MCP_TOKEN
               valueFrom: { secretKeyRef: { name: app-credentials, key: mcp-token } }
+            - name: DASH0_TOKEN
+              valueFrom: { secretKeyRef: { name: dash0-credentials, key: token, optional: true } }
           ports:
             - { name: http, containerPort: 8090 }
           volumeMounts:

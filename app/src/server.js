@@ -34,7 +34,7 @@ if (ROLE === 'web') {
 app.use(express.json({ limit: '256kb' }));
 
 const wrap = (fn) => (req, res) => fn(req, res).catch((err) => {
-  console.error(JSON.stringify({ level: 'error', msg: err.message, route: req.route?.path }));
+  if (!err.status || err.status >= 500) t.log('error', err.message, { 'http.route': req.route?.path || req.path, 'error.type': err.name || 'Error' });
   res.status(err.status || 500).json({ error: err.status ? err.message : 'internal error' });
 });
 const bad = (msg, status = 400) => Object.assign(new Error(msg), { status });
@@ -82,7 +82,7 @@ async function scanBatch(req, res) {
       const s = valid[i];
       if (it.create.status === 201) accepted.push(s);
       else if (it.create.status === 409) duplicate.push(s.scan_id); // retried batch: already stored
-      else console.error(JSON.stringify({ level: 'error', msg: 'scan not stored', status: it.create.status, error: it.create.error?.type }));
+      else t.log('error', 'scan not stored', { 'leadguard.booth.id': booth, 'http.response.status_code': it.create.status, 'error.type': it.create.error?.type || 'unknown' });
       // Anything not in `stored` stays on the device and is retried.
     });
     // Duplicates go through too: the merge is idempotent by scan_id, so a batch retried after
@@ -93,6 +93,11 @@ async function scanBatch(req, res) {
   t.scans.add(accepted.length, { 'leadguard.booth.id': booth, outcome: 'accepted' });
   if (duplicate.length) t.scans.add(duplicate.length, { 'leadguard.booth.id': booth, outcome: 'duplicate' });
   if (rejected) t.scans.add(rejected, { 'leadguard.booth.id': booth, outcome: 'rejected' });
+  t.log('info', 'scan batch', {
+    'leadguard.booth.id': booth, 'leadguard.scanner.id': scanner, 'leadguard.batch.size': batch.length,
+    'leadguard.scans.accepted': accepted.length, 'leadguard.scans.duplicate': duplicate.length, 'leadguard.scans.rejected': rejected,
+    'leadguard.scans.synced_late': valid.filter((v) => m.scanTime(v.scanned_at, received).clock === 'queued').length,
+  });
   // The device deletes everything it sees in `stored`, so a retried batch never double-counts.
   res.json({ stored: [...accepted.map((s) => s.scan_id), ...duplicate], rejected });
 }
@@ -346,5 +351,5 @@ if (ROLE === 'web') {
 if (ROLE === 'integrity') require('./integrity').start();
 if (ROLE === 'web' && process.env.SEED_ON_START !== 'false') require('./seed').ensure();
 
-const server = app.listen(PORT, () => console.log(JSON.stringify({ level: 'info', msg: `leadguard ${ROLE} listening`, port: PORT, version: VERSION })));
+const server = app.listen(PORT, () => t.log('info', `leadguard ${ROLE} listening`, { 'leadguard.role': ROLE, 'service.version': VERSION }));
 process.on('SIGTERM', () => server.close(() => process.exit(0)));

@@ -69,7 +69,12 @@ async function tick() {
     if (ops.length) {
       const r = await es().bulk({ operations: ops, refresh: 'wait_for' });
       if (r.errors) throw new Error(`anomaly upsert: ${JSON.stringify(r.items.find((x) => x.update?.error).update.error).slice(0, 200)}`);
-      r.items.forEach((it, i) => { if (it.update.result === 'created') { created++; t.anomalies.add(1, { 'leadguard.anomaly.kind': found[i].kind }); } });
+      r.items.forEach((it, i) => {
+        if (it.update.result !== 'created') return;
+        created++;
+        t.anomalies.add(1, { 'leadguard.anomaly.kind': found[i].kind });
+        t.log('warn', `anomaly: ${found[i].kind}`, { 'leadguard.anomaly.kind': found[i].kind, 'leadguard.booth.id': found[i].booth_id || '', 'leadguard.anomaly.explain': m.EXPLAIN[found[i].kind] || '' });
+      });
     }
     // Clear booth/scanner anomalies that are no longer detected.
     const live = new Set(found.filter((a) => SELF_CLEARING.includes(a.kind)).map(m.anomalyId));
@@ -85,11 +90,11 @@ function start() {
   const loop = async () => {
     if (running) return; // a slow sweep never overlaps the next one
     running = true;
-    try { await tick(); } catch (err) { console.error(JSON.stringify({ level: 'error', msg: `integrity sweep: ${err.message}` })); } finally { running = false; }
+    try { await tick(); } catch (err) { t.log('error', `integrity sweep failed: ${err.message}`, { 'error.type': err.name || 'Error' }); } finally { running = false; }
   };
   setTimeout(loop, 5000);
   setInterval(loop, INTERVAL_S * 1000);
-  console.log(JSON.stringify({ level: 'info', msg: 'integrity loop started', interval_s: INTERVAL_S, window_min: WINDOW_MIN }));
+  t.log('info', 'integrity loop started', { 'leadguard.integrity.interval_s': INTERVAL_S, 'leadguard.integrity.window_min': WINDOW_MIN });
 }
 
 module.exports = { start, tick };
