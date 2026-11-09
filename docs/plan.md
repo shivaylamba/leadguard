@@ -134,7 +134,7 @@ Booth and scanner anomalies clear themselves when fixed; lead anomalies wait for
 │                    │ reads                                │ create scans (_id=scan_id), leads │
 │ integrity (ROLE=integrity): ES|QL LOOKUP JOIN · impossible travel · booth health → anomalies  │
 │ otel-collector: k8sattributes · privacy scrub · spanmetrics · count ──► Dash0                 │
-│ seed Job (PostSync): indices, booths, attendees                                               │
+│ seed: run by the web role at start-up (idempotent): indices, booths, attendees               │
 └─────────────────────────────┬────────────────────────────────────────────────────────────────┘
                               ▼
                   Elastic Serverless (the only data store)
@@ -154,8 +154,8 @@ Booth and scanner anomalies clear themselves when fixed; lead anomalies wait for
 
 ## 5. Status: built and running on the Civo stand-in cluster
 
-- `app/`: one Node 22 image with three roles (web, ingest, integrity), plus `seed.js` and `simulate.js`. 14 unit and contract tests.
-- `deploy/`: web, ingest Rollout + analysis, integrity, Collector, OTel SDK config, seed hook.
+- `app/`: one Node 22 image with three roles (web, ingest, integrity), plus `seed.js` (run at web start-up) and `simulate.js`. 17 unit and contract tests.
+- `deploy/`: web, ingest Rollout + analysis, integrity, Collector, OTel SDK config. There's no PostSync hook: it would wait on a paused canary and block every later deploy.
 - `local/`: a kind cluster on the Civo VM with Argo CD, Rollouts, Gateway CRDs, Prometheus (`monitoring/prometheus-server`), Elasticsearch 9.5.6 (trial, multilingual E5) and LGTM standing in for Dash0.
 - `.gitar/`: review instructions, rules, auto-apply. `.github/workflows/ci.yaml`: lint, tests, kubeconform.
 

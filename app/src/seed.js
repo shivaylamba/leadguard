@@ -1,4 +1,6 @@
-// Create indices and load the registry. Idempotent: runs as an Argo CD PostSync hook.
+// Create indices and load the registry. Idempotent: the web role runs it at start-up (no Argo CD
+// PostSync hook: hooks wait for every resource to be healthy, and a canary paused for a human
+// decision would block every later deploy).
 //   node src/seed.js            create what's missing, load booths + attendees if empty
 //   node src/seed.js --reset    drop everything (check-ins, scans, leads, anomalies too)
 //   node src/seed.js --csv f    import attendees from a registration export instead of synthetic ones
@@ -114,13 +116,14 @@ async function bulk(index, docs, idField) {
   return docs.length;
 }
 
-async function main() {
-  const reset = process.argv.includes('--reset');
-  const csv = process.argv[process.argv.indexOf('--csv') + 1];
+async function main(argv = process.argv) {
+  const reset = argv.includes('--reset');
+  const csv = argv.includes('--csv') ? argv[argv.indexOf('--csv') + 1] : null;
   for (const [name, body] of Object.entries(INDICES)) {
     const exists = await es().indices.exists({ index: name });
     if (exists && reset) await es().indices.delete({ index: name });
-    if (!exists || reset) await es().indices.create({ index: name, ...body });
+    // Two web pods may start together: "already exists" from the other one is fine.
+    if (!exists || reset) await es().indices.create({ index: name, ...body }, { ignore: [400] });
   }
   // If leads was created before semantic search was configured (or by an early write), add the
   // semantic field in place instead of dropping the sponsors' leads.
@@ -137,7 +140,7 @@ async function main() {
   }
   const booths = await bulk(INDEX.booths, BOOTHS, 'booth_id');
   const have = (await es().count({ index: INDEX.attendees })).count;
-  const attendees = have && !reset && !process.argv.includes('--csv') ? 0 : await bulk(INDEX.attendees, csv && process.argv.includes('--csv') ? fromCsv(csv) : synthetic(), 'badge_id');
+  const attendees = have && !reset && !csv ? 0 : await bulk(INDEX.attendees, csv ? fromCsv(csv) : synthetic(), 'badge_id');
   console.log(JSON.stringify({ level: 'info', msg: 'seed done', booths, attendees_loaded: attendees, attendees_existing: have, semantic: SEMANTIC || null, reset }));
 }
 
@@ -145,4 +148,15 @@ if (require.main === module) {
   main().catch((err) => { console.error(JSON.stringify({ level: 'error', msg: err.message })); process.exit(1); });
 }
 
-module.exports = { synthetic, BOOTHS };
+// Retry until Elasticsearch is reachable (first boot: the model may still be deploying).
+async function ensure({ attempts = 30, delayMs = 10000 } = {}) {
+  for (let i = 1; i <= attempts; i++) {
+    try { await main([]); return true; } catch (err) {
+      console.error(JSON.stringify({ level: 'warn', msg: `seed attempt ${i}: ${err.message}` }));
+      await new Promise((r) => setTimeout(r, delayMs));
+    }
+  }
+  return false;
+}
+
+module.exports = { synthetic, BOOTHS, main, ensure };

@@ -13,7 +13,6 @@ resources:
   - ingest.yaml
   - integrity.yaml
   - analysis-template.yaml
-  - seed-job.yaml
 images:
   - name: app
     newName: ghcr.io/shivaylamba/leadguard

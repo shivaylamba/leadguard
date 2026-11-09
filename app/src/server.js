@@ -302,6 +302,7 @@ if (ROLE === 'web') {
 }
 
 if (ROLE === 'integrity') require('./integrity').start();
+if (ROLE === 'web' && process.env.SEED_ON_START !== 'false') require('./seed').ensure();
 
 const server = app.listen(PORT, () => console.log(JSON.stringify({ level: 'info', msg: `leadguard ${ROLE} listening`, port: PORT, version: VERSION })));
 process.on('SIGTERM', () => server.close(() => process.exit(0)));
