@@ -15,6 +15,7 @@ const t = require('./telemetry');
 const MCP_TOKEN = process.env.MCP_TOKEN || '';
 const AURA_URL = process.env.AURA_URL || 'http://aura:8090';
 const DRAFTS = 'drafts';
+const ASKS = 'ops_asks';
 const text = (obj) => ({ content: [{ type: 'text', text: JSON.stringify(obj, null, 1) }] });
 
 async function boothTimeline(booth, minutes) {
@@ -126,17 +127,45 @@ function mount(app, wrap) {
   for (const verb of ['get', 'delete']) app[verb]('/mcp', (_req, res) => res.status(405).json({ error: 'stateless MCP: POST only' }));
 
   // "Ask ops": the organizer asks AURA a question in plain language.
+  // Asking takes 10-90 s: longer than the hackathon gateway (15 s) holds a request. So POST starts a job
+  // stored in Elasticsearch (any web replica can answer the poll) and GET /api/ops/ask/:id returns it.
+  async function answer(id, question) {
+    const done = (doc) => es().update({ index: ASKS, id, doc: { ...doc, answered_at: new Date().toISOString() } });
+    try {
+      const r = await t.inSpan('ask aura', {}, () => fetch(`${AURA_URL}/v1/chat/completions`, {
+        method: 'POST', headers: { 'content-type': 'application/json' }, signal: AbortSignal.timeout(180000),
+        body: JSON.stringify({ model: 'leadguard-ops', stream: false, messages: [{ role: 'user', content: question }] }),
+      }));
+      if (!r.ok) {
+        t.log('error', 'assistant unavailable', { 'http.response.status_code': r.status });
+        return await done({ status: 'failed', error: `assistant unavailable (${r.status})` });
+      }
+      const out = await r.json();
+      const text = out.choices?.[0]?.message?.content ?? '';
+      t.log('info', 'assistant answered', { 'leadguard.ops.answer_chars': text.length });
+      await done({ status: 'answered', answer: text });
+    } catch (err) {
+      t.log('error', `assistant failed: ${err.message}`, { 'error.type': err.name || 'Error' });
+      await done({ status: 'failed', error: err.name === 'TimeoutError' ? 'assistant timed out' : 'assistant failed' }).catch(() => {});
+    }
+  }
+
   app.post('/api/ops/ask', wrap(async (req, res) => {
     const question = String(req.body?.question ?? '').trim().slice(0, 1000);
     if (question.length < 3) return res.status(400).json({ error: 'ask a question' });
-    const r = await t.inSpan('ask aura', {}, () => fetch(`${AURA_URL}/v1/chat/completions`, {
-      method: 'POST', headers: { 'content-type': 'application/json' }, signal: AbortSignal.timeout(180000),
-      body: JSON.stringify({ model: 'leadguard-ops', stream: false, messages: [{ role: 'user', content: question }] }),
-    }));
-    if (!r.ok) { t.log('error', 'assistant unavailable', { 'http.response.status_code': r.status }); return res.status(502).json({ error: `assistant unavailable (${r.status})` }); }
-    const out = await r.json();
-    t.log('info', 'assistant answered', { 'leadguard.ops.answer_chars': (out.choices?.[0]?.message?.content ?? '').length });
-    res.json({ answer: out.choices?.[0]?.message?.content ?? '' });
+    const id = crypto.randomUUID();
+    await es().index({ index: ASKS, id, refresh: 'wait_for', document: { status: 'pending', created_at: new Date().toISOString() } });
+    answer(id, question);
+    res.status(202).json({ id, status: 'pending' });
+  }));
+
+  app.get('/api/ops/ask/:id', wrap(async (req, res) => {
+    const id = String(req.params.id);
+    if (!/^[0-9a-f-]{36}$/.test(id)) return res.status(400).json({ error: 'invalid id' });
+    const r = await es().get({ index: ASKS, id }, { ignore: [404] });
+    if (!r.found) return res.status(404).json({ error: 'not found' });
+    const { status, answer: text, error } = r._source;
+    res.json({ id, status, answer: text, error });
   }));
 
   app.get('/api/ops/drafts', wrap(async (_req, res) => {

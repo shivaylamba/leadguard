@@ -15,9 +15,10 @@ const server = fs.readdirSync(path.join(root, 'app', 'src')).filter((f) => f.end
 const routes = new Set([...server.matchAll(/app\.(?:get|post|put|delete)\('(\/api\/[^']+)'/g)].map((x) => norm(x[1])));
 for (const x of server.matchAll(/\['(\/api\/[^\]]+)\]\) app\.post/g)) for (const p of x[1].split("', '")) routes.add(norm(p.replace(/'/g, '')));
 const ui = read('app/public/app.js');
-// api('/api/a') and api('/api/a/' + encodeURIComponent(x) + '/b'): a concatenated segment is a parameter.
+// api('/api/a'), api('/api/a/' + encodeURIComponent(x)) and api('/api/a/' + encodeURIComponent(x) + '/b'):
+// a concatenated segment is a parameter (a literal ending in '/' is followed by one).
 const called = new Set([...ui.matchAll(/(?:api|post)\('(\/api\/[^'?]*)'(?:\s*\+[^']*?'(\/[^'?]*)')?/g)]
-  .map((x) => norm(x[2] ? `${x[1].replace(/\/$/, '')}/{}${x[2]}` : x[1])));
+  .map((x) => norm(x[2] ? `${x[1].replace(/\/$/, '')}/{}${x[2]}` : x[1].endsWith('/') ? `${x[1]}{}` : x[1])));
 
 test('every server route is in the OpenAPI spec', () => {
   for (const r of routes) assert.ok(spec.has(r), `route ${r} missing from api/openapi.yaml`);

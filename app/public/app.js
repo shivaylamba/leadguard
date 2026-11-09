@@ -187,7 +187,18 @@
       e.preventDefault();
       var q = document.getElementById('aq').value.trim(); if (!q) return;
       var out = document.getElementById('answer'); out.textContent = 'Investigating…';
-      post('/api/ops/ask', { question: q }).then(function (r) { out.innerHTML = '<div style="white-space:pre-wrap">' + md(r.answer) + '</div>'; window.rum.event('ops_ask', {}); drafts(); })
+      // The answer takes up to a minute or two: start the job, then poll for it.
+      var started = Date.now();
+      var poll = function (id) {
+        return api('/api/ops/ask/' + encodeURIComponent(id)).then(function (r) {
+          if (r.status === 'answered') { out.innerHTML = '<div style="white-space:pre-wrap">' + md(r.answer) + '</div>'; window.rum.event('ops_ask', {}); drafts(); return; }
+          if (r.status === 'failed') throw new Error(r.error || 'failed');
+          if (Date.now() - started > 240000) throw new Error('no answer after 4 minutes');
+          out.textContent = 'Investigating… ' + Math.round((Date.now() - started) / 1000) + ' s';
+          return new Promise(function (ok) { setTimeout(ok, 2500); }).then(function () { return poll(id); });
+        });
+      };
+      post('/api/ops/ask', { question: q }).then(function (r) { return poll(r.id); })
         .catch(function (err) { out.textContent = 'The assistant is unavailable: ' + err.message; });
     });
     function drafts() {

@@ -73,7 +73,9 @@ paths:
   /api/stats:
     get: { summary: Check-ins, scans, per-minute desk throughput }
   /api/ops/ask:
-    post: { summary: Ask the AI SRE (AURA) a question about the event; answers from LeadGuard evidence via MCP }
+    post: { summary: "Ask the AI SRE (AURA) a question about the event. Returns 202 with a job id; the answer comes from LeadGuard evidence via MCP" }
+  /api/ops/ask/{id}:
+    get: { summary: "An ask job: status pending, answered (with the answer) or failed" }
   /api/ops/drafts:
     get: { summary: Sponsor messages drafted by the AI SRE, with approval status }
   /api/ops/drafts/{id}/approve:
