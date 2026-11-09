@@ -16,4 +16,4 @@ resources:
 images:
   - name: app
     newName: ghcr.io/shivaylamba/overflow
-    newTag: ab0ef03
+    newTag: e3ee892
