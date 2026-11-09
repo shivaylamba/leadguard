@@ -24,7 +24,7 @@ k() { kubectl --context "$CTX" "$@"; }
 k create namespace argocd --dry-run=client -o yaml | k apply -f -
 k apply -n argocd --server-side --force-conflicts -f "https://raw.githubusercontent.com/argoproj/argo-cd/${ARGOCD}/manifests/install.yaml"
 k create namespace argo-rollouts --dry-run=client -o yaml | k apply -f -
-k apply -n argo-rollouts -f "https://github.com/argoproj/argo-rollouts/releases/download/${ROLLOUTS}/install.yaml"
+k apply -n argo-rollouts --server-side --force-conflicts -f "https://github.com/argoproj/argo-rollouts/releases/download/${ROLLOUTS}/install.yaml"
 k apply --server-side -f "https://github.com/kubernetes-sigs/gateway-api/releases/download/${GATEWAY}/standard-install.yaml"
 # Like the Radar cluster: Argo CD watches Applications in team-* namespaces, project team-<team>.
 k -n argocd patch configmap argocd-cmd-params-cm --type merge -p '{"data":{"application.namespaces":"team-*"}}'
