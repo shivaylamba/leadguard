@@ -7,7 +7,7 @@ names a port, a binary or a function. Findings go to LeadGuard's organizer view 
 
 Adapted from **Ekansh Gupta and Shivanshu Raj Shrivastava's** Observability Day rig,
 [github.com/eKuG/obs-day-na26](https://github.com/eKuG/obs-day-na26) ("Auto Deriving Threat Signals from OTel CPU
-Profiles & OBI Network Flows"). Changes: the "shop" is a LeadGuard check-in kiosk, findings are reported to
+Profiles & OBI Network Flows"), used with Ekansh's permission. Changes: the "shop" is a LeadGuard check-in kiosk, findings are reported to
 LeadGuard, ports moved so it can run next to the demo tunnel.
 
 Why a laptop: eBPF needs privileged containers with host PID, which the Radar team cluster refuses (and should).
