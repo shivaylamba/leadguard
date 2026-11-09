@@ -29,7 +29,7 @@ spec:
           env:
             - { name: ROLE, value: web }
             - { name: OTEL_SERVICE_NAME, value: leadguard-web }
-            - { name: TEAM_NAME, value: "overflow" }
+            - { name: TEAM_NAME, value: "shivaysree" }
             - { name: INGEST_URL, value: "http://ingest" }
             - { name: VENUE_TZ, value: America/Denver }
             - { name: COLLECTOR_HTTP, value: "http://otel-collector:4318" }

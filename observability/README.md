@@ -7,7 +7,7 @@ Everything here goes through the same PR + Gitar review as the app.
 | `dash0/dashboard.yaml` | "LeadGuard: conference health": check-ins per desk, scans per booth, scan→synced p95, device queues, anomalies by kind, scan outcomes, ingest error ratio, latency by route, desk not-found | `dash0 apply -f observability/dash0/` |
 | `dash0/check-rules.yaml` | Alerts: booth went silent, scan sync lag (SLO 30 s), ingest errors, check-in slow (SLO 2 s), lead integrity anomalies, desk can't find people | same |
 | `dash0/slos.yaml` | SLOs: 99.9% of scans stored; 99.5% of ingest writes succeed | same |
-| `dash0/synthetic-checks.yaml` | `/readyz` and `/api/booths/health` every minute (replace `<team>`) | same |
+| `dash0/synthetic-checks.yaml` | `/readyz` and `/api/booths/health` every minute  | same |
 
 `dash0/dashboard.yaml` is generated: edit `dash0/gen_dashboard.py` and re-run it.
 

@@ -74,5 +74,5 @@ if [ -n "${NEBIUS_API_KEY:-}" ]; then
   k -n "team-$TEAM" create secret generic nebius-credentials --from-file=api-key=<(printf %s "$NEBIUS_API_KEY") --dry-run=client -o yaml | k apply -f - >/dev/null
 fi
 
-k apply -f argocd/application.yaml
+k apply -f local/civo/application.yaml   # Civo: deploy/ re-namespaced (local/civo)
 echo "Done. Argo CD syncs deploy/ from GitHub. App: http://127.0.0.1:18080  Grafana: http://127.0.0.1:13300 (on the VM)"

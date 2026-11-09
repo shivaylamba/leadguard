@@ -1,0 +1,19 @@
+# Civo only: Argo CD deploys local/civo (deploy/ re-namespaced to team-overflow) on every push to main.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app
+  namespace: team-overflow
+spec:
+  project: team-overflow
+  source:
+    repoURL: https://github.com/shivaylamba/leadguard.git
+    targetRevision: main
+    path: local/civo
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: team-overflow
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

@@ -30,7 +30,7 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: otel-collector
-    namespace: team-overflow
+    namespace: team-shivaysree
 ---
 apiVersion: v1
 kind: ConfigMap

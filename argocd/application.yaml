@@ -5,16 +5,16 @@ apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: app
-  namespace: team-overflow
+  namespace: team-shivaysree
 spec:
-  project: team-overflow
+  project: team-shivaysree
   source:
     repoURL: https://github.com/shivaylamba/leadguard.git
     targetRevision: main
     path: deploy
   destination:
     server: https://kubernetes.default.svc
-    namespace: team-overflow
+    namespace: team-shivaysree
   syncPolicy:
     automated:
       prune: true
