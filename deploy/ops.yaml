@@ -1,0 +1,112 @@
+# AURA (mezmo/aura), the AI SRE from the ArgoCon demo, as the organizer's ops assistant.
+# Kimi K3.1 Pro on Nebius Token Factory; tools come from LeadGuard's MCP endpoint (http://app/mcp),
+# which returns evidence without personal data. Its one write tool only drafts sponsor messages,
+# which an organizer approves in the UI.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: aura-config
+data:
+  config.toml: |
+    [mcp]
+    sanitize_schemas = true
+
+    [mcp.servers.leadguard]
+    transport = "http_streamable"
+    url = "http://app/mcp"
+    description = "LeadGuard: booths, scanners, leads, check-ins, ticket emails and integrity anomalies for this conference"
+
+    [mcp.servers.leadguard.headers]
+    Authorization = "Bearer {{ env.MCP_TOKEN }}"
+
+    [agent]
+    name = "leadguard-ops"
+    turn_depth = 15
+    system_prompt = '''
+    You are the on-call ops assistant for a conference's organizers, running inside LeadGuard.
+    LeadGuard tracks registration check-ins, sponsor booth lead scanning, scanner devices, ticket
+    emails and integrity anomalies. Organizers ask you things like "what happened at the Radar
+    booth?", "why are people stuck at the desk?" or "is anything losing leads right now?".
+
+    How to work:
+    - Always look before you answer: start with get_booth_health, then get_booth_timeline or
+      list_anomalies for the booth or issue in question. Quote times in the venue time zone
+      (America/Denver) and say how you know (which tool, which numbers).
+    - Be precise about lead loss. Scans made while a scanner was offline and synced later are NOT
+      lost; say how many synced late. Only scans still queued on a device can be lost.
+    - Answer in at most 8 short lines: what happened, when, impact on leads, what to do now.
+    - If the organizer asks you to tell or write to a sponsor, call draft_sponsor_message with a
+      factual, friendly message. Say clearly that it waits for their approval; you never send anything.
+    - You have no access to names or emails, and you must not ask for them.
+    '''
+
+    [agent.llm]
+    provider = "openai"
+    base_url = "https://api.tokenfactory.nebius.com/v1"
+    api_key = "{{ env.NEBIUS_API_KEY }}"
+    model = "{{ env.OPS_MODEL | default: 'moonshotai/Kimi-K3.1-Pro' }}"
+    max_tokens = 4096
+    context_window = 262144
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aura
+  labels:
+    app: aura
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: aura
+  template:
+    metadata:
+      labels:
+        app: aura
+      annotations:
+        # Restart AURA when its config changes (the ConfigMap is read at start-up).
+        leadguard/config-version: "1"
+    spec:
+      containers:
+        - name: aura
+          image: mezmo/aura:0.2.20
+          env:
+            - { name: CONFIG_PATH, value: /app/config/config.toml }
+            - { name: HOST, value: 0.0.0.0 }
+            - { name: PORT, value: "8090" }
+            - { name: STREAMING_TIMEOUT_SECS, value: "180" }
+            - { name: OTEL_SERVICE_NAME, value: leadguard-aura }
+            - { name: OTEL_EXPORTER_OTLP_ENDPOINT, value: http://otel-collector:4317 }
+            - name: NEBIUS_API_KEY
+              valueFrom: { secretKeyRef: { name: nebius-credentials, key: api-key } }
+            - name: MCP_TOKEN
+              valueFrom: { secretKeyRef: { name: app-credentials, key: mcp-token } }
+          ports:
+            - { name: http, containerPort: 8090 }
+          volumeMounts:
+            - { name: config, mountPath: /app/config, readOnly: true }
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+            limits: { cpu: 500m, memory: 384Mi }
+          readinessProbe:
+            tcpSocket: { port: http }
+            periodSeconds: 10
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            allowPrivilegeEscalation: false
+            seccompProfile: { type: RuntimeDefault }
+            capabilities: { drop: ["ALL"] }
+      volumes:
+        - name: config
+          configMap: { name: aura-config }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: aura
+spec:
+  selector:
+    app: aura
+  ports:
+    - { name: http, port: 8090, targetPort: http }

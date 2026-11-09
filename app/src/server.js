@@ -303,6 +303,8 @@ if (ROLE === 'web') {
     res.status(201).json({ ok: true });
   }));
 
+  require('./ops').mount(app, wrap); // MCP for AURA + "Ask ops"
+
   app.use(express.static(path.join(__dirname, '..', 'public'), { maxAge: '5m' }));
 }
 

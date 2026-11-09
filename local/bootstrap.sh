@@ -56,9 +56,17 @@ k -n "team-$TEAM" create secret generic otlp-backend \
   --from-literal=endpoint=lgtm.observability:4317 --from-literal=token=none --from-literal=insecure=true \
   --dry-run=client -o yaml | k apply -f -
 if ! k -n "team-$TEAM" get secret app-credentials >/dev/null 2>&1; then
-  k -n "team-$TEAM" create secret generic app-credentials --from-literal=pseudonym-salt="$(openssl rand -hex 16)" --from-literal=webhook-token="$(openssl rand -hex 16)"
-elif ! k -n "team-$TEAM" get secret app-credentials -o jsonpath='{.data.webhook-token}' | grep -q .; then
-  k -n "team-$TEAM" patch secret app-credentials -p "{\"stringData\":{\"webhook-token\":\"$(openssl rand -hex 16)\"}}"
+  k -n "team-$TEAM" create secret generic app-credentials --from-literal=pseudonym-salt="$(openssl rand -hex 16)" --from-literal=webhook-token="$(openssl rand -hex 16)" --from-literal=mcp-token="$(openssl rand -hex 16)"
+fi
+for key in webhook-token mcp-token; do   # added later: patch in if missing
+  if ! k -n "team-$TEAM" get secret app-credentials -o jsonpath="{.data.$key}" | grep -q .; then
+    k -n "team-$TEAM" patch secret app-credentials -p "{\"stringData\":{\"$key\":\"$(openssl rand -hex 16)\"}}"
+  fi
+done
+# The ops assistant's model key: pass NEBIUS_API_KEY in the environment; never written to git.
+if [ -n "${NEBIUS_API_KEY:-}" ]; then
+  # --from-file via process substitution keeps the key out of the process list.
+  k -n "team-$TEAM" create secret generic nebius-credentials --from-file=api-key=<(printf %s "$NEBIUS_API_KEY") --dry-run=client -o yaml | k apply -f - >/dev/null
 fi
 
 k apply -f argocd/application.yaml

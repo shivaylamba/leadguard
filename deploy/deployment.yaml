@@ -41,6 +41,9 @@ spec:
               valueFrom: { secretKeyRef: { name: es-credentials, key: semantic-inference-id, optional: true } }
             - name: PSEUDONYM_SALT
               valueFrom: { secretKeyRef: { name: app-credentials, key: pseudonym-salt, optional: true } }
+            - name: MCP_TOKEN
+              valueFrom: { secretKeyRef: { name: app-credentials, key: mcp-token, optional: true } }
+            - { name: AURA_URL, value: "http://aura:8090" }
           envFrom:
             - configMapRef: { name: otel-sdk }
           resources:

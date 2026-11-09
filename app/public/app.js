@@ -131,7 +131,27 @@
 
   // ── Organizer console ──────────────────────────────────────────────────
   function ops() {
-    main.innerHTML = '<h2>Organizer</h2><div id="stats" class="row"></div><h3>Booths</h3><div id="booths" class="grid"></div><h3>Anomalies</h3><div id="anoms"></div><h3>Tickets at risk</h3><div id="risk"></div>';
+    main.innerHTML = '<h2>Organizer</h2><div id="stats" class="row"></div>' +
+      '<form id="ask" class="card"><label for="aq"><strong>Ask ops</strong> (AI SRE: AURA on Kimi K3.1 Pro)</label><div class="row"><input id="aq" placeholder="What happened at the Radar booth in the last hour?" autocomplete="off">' +
+      '<button class="primary">Ask</button></div><div id="answer" class="meta" aria-live="polite"></div></form><div id="drafts"></div>' +
+      '<h3>Booths</h3><div id="booths" class="grid"></div><h3>Anomalies</h3><div id="anoms"></div><h3>Tickets at risk</h3><div id="risk"></div>';
+    document.getElementById('ask').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var q = document.getElementById('aq').value.trim(); if (!q) return;
+      var out = document.getElementById('answer'); out.textContent = 'Investigating…';
+      post('/api/ops/ask', { question: q }).then(function (r) { out.innerHTML = '<div style="white-space:pre-wrap">' + esc(r.answer) + '</div>'; window.rum.event('ops_ask', {}); drafts(); })
+        .catch(function (err) { out.textContent = 'The assistant is unavailable: ' + err.message; });
+    });
+    function drafts() {
+      api('/api/ops/drafts').then(function (r) {
+        var pending = r.drafts.filter(function (d) { return d.status === 'awaiting_approval'; });
+        document.getElementById('drafts').innerHTML = pending.length ? '<h3>Drafts waiting for your approval</h3>' + pending.map(function (d) {
+          return '<article class="card"><h3>' + esc(d.subject) + '</h3><p class="meta">to the ' + esc(d.booth_id) + ' sponsor · drafted by ' + esc(d.author) + ' at ' + time(d.created_at) + '</p><div style="white-space:pre-wrap">' + esc(d.body) + '</div><p><button class="primary" data-approve="' + esc(d.id) + '">Approve</button></p></article>';
+        }).join('') : '';
+        main.querySelectorAll('[data-approve]').forEach(function (b) { b.onclick = function () { post('/api/ops/drafts/' + encodeURIComponent(b.dataset.approve) + '/approve', {}).then(function () { say('Approved'); drafts(); }); }; });
+      }).catch(function () {});
+    }
+    drafts();
     every(function () {
       api('/api/stats').then(function (s) {
         var last = s.checkins_per_min.slice(-5).reduce(function (a, b) { return a + b.n; }, 0);

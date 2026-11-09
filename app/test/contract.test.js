@@ -10,7 +10,8 @@ const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
 const norm = (p) => p.replace(/:[A-Za-z_]+/g, '{}').replace(/\{[^}]+\}/g, '{}');
 
 const spec = new Set([...read('api/openapi.yaml').matchAll(/^ {2}(\/api\/[^:]+):\s*$/gm)].map((x) => norm(x[1])));
-const server = read('app/src/server.js');
+// Routes can be defined in any module under app/src (server.js, ops.js, …).
+const server = fs.readdirSync(path.join(root, 'app', 'src')).filter((f) => f.endsWith('.js')).map((f) => read(`app/src/${f}`)).join('\n');
 const routes = new Set([...server.matchAll(/app\.(?:get|post|put|delete)\('(\/api\/[^']+)'/g)].map((x) => norm(x[1])));
 for (const x of server.matchAll(/\['(\/api\/[^\]]+)\]\) app\.post/g)) for (const p of x[1].split("', '")) routes.add(norm(p.replace(/'/g, '')));
 const ui = read('app/public/app.js');
