@@ -46,13 +46,13 @@ main { max-width: 1180px; margin: 0 auto; padding: 40px 24px 120px; outline: non
 main:focus, main:focus-visible { outline: none; }
 .foot { max-width: 1180px; margin: 0 auto; padding: 0 24px 40px; color: var(--dim); font-size: 14px; }
 
-@media (max-width: 1180px) { .event { display: none; } }
+@media (max-width: 1180px) { #eventname, .event > span[aria-hidden] { display: none; } }
+@media (max-width: 860px) { .event { display: inline-flex; margin-left: auto; padding: 5px 10px; } .top-in .icon-btn { margin-left: 0; } }
 @media (max-width: 860px) {
   .top { backdrop-filter: none; background: var(--bg); }
   .tabs { position: fixed; left: 12px; right: 12px; bottom: 12px; margin: 0; justify-content: space-between; border-radius: 20px; padding: 6px; box-shadow: 0 10px 30px -10px rgba(0,0,0,.5); }
   .tabs a { flex: 1; flex-direction: column; gap: 2px; padding: 8px 4px; font-size: 12px; border-radius: 14px; }
   .tabs a svg.i { width: 22px; height: 22px; }
-  .top-in .icon-btn { margin-left: auto; }
   main { padding: 28px 16px 140px; }
   .foot { padding-bottom: 110px; }
 }

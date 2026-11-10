@@ -51,6 +51,12 @@
   function paintTheme() { var t = currentTheme(); themeBtn.innerHTML = icon(t === 'dark' ? 'sun' : 'moon'); themeBtn.setAttribute('aria-label', 'Switch to ' + (t === 'dark' ? 'light' : 'dark') + ' theme'); }
   themeBtn.onclick = function () { var next = currentTheme() === 'dark' ? 'light' : 'dark'; document.documentElement.dataset.theme = next; store.set('leadguard.theme', next); paintTheme(); };
   paintTheme();
+  function paintNet() {
+    var on = navigator.onLine && store.get('leadguard.wifiOff', '0') !== '1';
+    document.getElementById('netdot').className = 'dot' + (on ? '' : ' off');
+    document.getElementById('nettext').textContent = on ? 'Live' : 'Offline';
+  }
+  addEventListener('online', paintNet); addEventListener('offline', paintNet); paintNet();
 
   function head(eyebrow, title, lede, right) {
     return '<div class="page-head"><div><p class="eyebrow">' + eyebrow + '</p><h1 class="title">' + title + '</h1>' + (lede ? '<p class="lede">' + lede + '</p>' : '') + '</div>' + (right || '') + '</div>';
@@ -145,7 +151,8 @@
   // ── Booth scanner: works offline, syncs when the Wi-Fi comes back ──────
   var QKEY = 'leadguard.queue';
   function queue() { return JSON.parse(store.get(QKEY, '[]')); }
-  function saveQueue(q) { store.set(QKEY, JSON.stringify(q)); }
+  // The queue is the only copy of an offline lead, so a failed write must surface, never be swallowed.
+  function saveQueue(q) { localStorage.setItem(QKEY, JSON.stringify(q)); }
   function scanner() {
     markTab('scan');
     var booth = store.get('leadguard.booth', '');
@@ -171,14 +178,19 @@
         '</div></div>';
       if (!booth) { booth = r.booths[0].booth_id; store.set('leadguard.booth', booth); }
       document.getElementById('booth').onchange = function (e) { booth = e.target.value; store.set('leadguard.booth', booth); status(); };
-      document.getElementById('wifi').onchange = function (e) { store.set('leadguard.wifiOff', e.target.checked ? '1' : '0'); window.rum.event('wifi_toggle', { off: e.target.checked }); say(e.target.checked ? 'Wi-Fi off: scans stay on this phone' : 'Wi-Fi back on'); sync(); status(); };
+      document.getElementById('wifi').onchange = function (e) { store.set('leadguard.wifiOff', e.target.checked ? '1' : '0'); window.rum.event('wifi_toggle', { off: e.target.checked }); say(e.target.checked ? 'Wi-Fi off: scans stay on this phone' : 'Wi-Fi back on'); paintNet(); sync(); status(); };
       document.getElementById('scan').addEventListener('submit', function (e) {
         e.preventDefault();
         var badge = document.getElementById('badge').value.trim().toUpperCase();
         var q = queue();
         q.push({ scan_id: scannerId + '-' + Date.now(), badge_id: badge, scanned_at: new Date().toISOString(),
           consent: document.getElementById('consent').checked, notes: document.getElementById('notes').value.trim() });
-        saveQueue(q); window.rum.event('scan', { 'leadguard.booth.id': booth });
+        try { saveQueue(q); } catch (err) {
+          say('Not saved: this phone cannot store the scan. Keep the badge number and try again.');
+          document.getElementById('lastsaved').innerHTML = '<span class="pill bad">Not saved</span> This phone could not store the scan (' + esc(err.name) + ').';
+          return;
+        }
+        window.rum.event('scan', { 'leadguard.booth.id': booth });
         lastSaved = badge + ' · ' + time(new Date().toISOString());
         document.getElementById('badge').value = ''; document.getElementById('notes').value = ''; say('Lead saved on this device');
         document.getElementById('lastsaved').innerHTML = icon('check') + ' Saved ' + esc(lastSaved);
