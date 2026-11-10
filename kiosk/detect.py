@@ -13,6 +13,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 import urllib.parse
 import urllib.request
 
@@ -66,7 +67,8 @@ def profile(pid):
     """(cores, {function: share of self CPU}) for one host pid over the last minute. Source: eBPF profiler."""
     req = urllib.request.Request(
         f"{PYRO}/querier.v1.QuerierService/LabelValues",
-        data=json.dumps({"name": "service_name"}).encode(),
+        # Pyroscope needs a time range on label queries; the last 5 minutes covers any live process.
+        data=json.dumps({"name": "service_name", "start": int((time.time() - 300) * 1000), "end": int(time.time() * 1000)}).encode(),
         headers={"Content-Type": "application/json"},
     )
     services = json.load(urllib.request.urlopen(req, timeout=10)).get("names", [])

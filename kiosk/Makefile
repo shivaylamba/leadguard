@@ -25,7 +25,7 @@ detect:            ## diff now against the baseline; follow the PID for anything
 	@python3 detect.py detect
 
 report:            ## detect, and send findings to LeadGuard's organizer view (LEADGUARD_URL)
-	@python3 detect.py detect --report
+	@SSL_CERT_FILE=$${SSL_CERT_FILE:-$$(python3 -c 'import certifi;print(certifi.where())' 2>/dev/null || echo /etc/ssl/cert.pem)} python3 detect.py detect --report
 
 check:             ## preflight before going on stage
 	@python3 detect.py check
