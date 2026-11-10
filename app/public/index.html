@@ -2,29 +2,33 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0d1222">
   <title>LeadGuard</title>
-  <link rel="stylesheet" href="/style.css">
+  <link rel="preload" href="/fonts/fraunces.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/inter.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/style.css?v=ui2">
+  <script>try { var t = localStorage.getItem('leadguard.theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) {}</script>
 </head>
 <body>
   <a class="skip" href="#main">Skip to content</a>
-  <header>
-    <h1><a href="#/">LeadGuard</a></h1>
-    <p class="tag">Check-ins you can trust. Leads sponsors can trust.</p>
-    <nav aria-label="Views">
-      <a href="#/desk">Desk</a>
-      <a href="#/badges">Walk-ups &amp; badges</a>
-      <a href="#/scan">Booth scanner</a>
-      <a href="#/ops">Organizer</a>
-      <a href="#/leads">Sponsor leads</a>
-    </nav>
+  <header class="top">
+    <div class="top-in">
+      <a class="brand" href="#/" aria-label="LeadGuard home">
+        <svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 2.5 4.5 6.8v8.4c0 7.2 4.9 12.3 11.5 14.3 6.6-2 11.5-7.1 11.5-14.3V6.8L16 2.5Z" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"/><path d="m10.5 16 3.8 3.8 7.4-7.6" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        LeadGuard
+      </a>
+      <span class="event"><span class="dot" id="netdot" aria-hidden="true"></span><span id="eventname">Cloud Native Hackathon · Salt Lake City</span></span>
+      <nav class="tabs" aria-label="Views" id="tabs"></nav>
+      <button class="icon-btn" id="theme" type="button" aria-label="Switch to light theme"></button>
+    </div>
   </header>
   <main id="main" tabindex="-1"></main>
   <div id="live" class="sr-only" aria-live="polite"></div>
-  <footer><span id="ver"></span> · synthetic attendee data</footer>
+  <footer class="foot"><span id="ver"></span> · synthetic attendee data</footer>
   <script src="/vendor/qrcode.js"></script>
   <script src="/vendor/jsQR.js"></script>
   <script src="/rum.js"></script>
-  <script src="/app.js"></script>
+  <script src="/app.js?v=ui2"></script>
 </body>
 </html>

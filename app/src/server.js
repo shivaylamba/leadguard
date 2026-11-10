@@ -254,6 +254,15 @@ if (ROLE === 'web') {
   // Browser libraries for badges (QR generation) and scanning on phones without BarcodeDetector.
   const vendor = { 'qrcode.js': require.resolve('qrcode-generator'), 'jsQR.js': require.resolve('jsqr') };
   app.get('/vendor/:file', (req, res) => (vendor[req.params.file] ? res.type('js').sendFile(vendor[req.params.file]) : res.status(404).end()));
+  // Self-hosted UI fonts (OFL), so the venue's Wi-Fi never decides how the desk looks.
+  const fontDir = (pkg) => path.join(path.dirname(require.resolve(`${pkg}/package.json`)), 'files');
+  const fonts = {
+    'fraunces.woff2': path.join(fontDir('@fontsource-variable/fraunces'), 'fraunces-latin-wght-normal.woff2'),
+    'inter.woff2': path.join(fontDir('@fontsource-variable/inter'), 'inter-latin-wght-normal.woff2'),
+  };
+  app.get('/fonts/:file', (req, res) => (fonts[req.params.file]
+    ? res.type('font/woff2').set('cache-control', 'public, max-age=604800, immutable').sendFile(fonts[req.params.file])
+    : res.status(404).end()));
 
   app.get('/api/booths', wrap(async (_req, res) => {
     const r = await es().search({ index: INDEX.booths, size: 100, sort: [{ booth_id: 'asc' }] });
